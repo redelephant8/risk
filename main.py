@@ -10,6 +10,23 @@ width, height = 800, 600
 screen = pygame.display.set_mode((width, height))
 pygame.display.set_caption("Risk")
 
+def edit_screen():
+    # Clear the screen
+    screen.fill((255, 255, 255))  # Fill with white background
+
+    # Draw the territories
+    game.board.territories["qatar"].draw(screen)
+    game.board.territories["afghanistan"].draw(screen)
+    game.board.territories["saudi_arabia"].draw(screen)
+    game.board.territories["iran"].draw(screen)
+    game.board.territories["egypt"].draw(screen)
+
+    # Update the display
+    pygame.display.flip()
+
+    # Control the frame rate
+    pygame.time.Clock().tick(60)
+
 
 
 class Game:
@@ -31,6 +48,11 @@ class Game:
         else:
             self.current_player = self.players[i+1]
             self.current_player_index = i+1
+
+    def add_territories(self, current_player, selected_territory):
+        current_player.territories.append(selected_territory)
+        selected_territory.owner = current_player
+        selected_territory.soldiers += 1
 
     def choosing_initial_territories(self):
         territories_remaining = 5
@@ -54,24 +76,67 @@ while running:
             pygame.quit()
             sys.exit()
 
-    game.choosing_initial_territories()
+        # Clear the screen
+    screen.fill((255, 255, 255))  # Fill with white background
 
+    # Draw the territories
+    game.board.territories["qatar"].draw(screen)
+    game.board.territories["afghanistan"].draw(screen)
+    game.board.territories["saudi_arabia"].draw(screen)
+    game.board.territories["iran"].draw(screen)
+    game.board.territories["egypt"].draw(screen)
 
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            mouse_pos = pygame.mouse.get_pos()
+    # Update the display
+    pygame.display.flip()
 
-            # Check if any territory is clicked
-            for territory_name, territory in game.board.territories.items():
-                if territory.click(mouse_pos):
-                    print(f"Number of soldiers on {territory_name}: {territory.soldierNumber}")
+    game_state = 1
+    territories_remaining = 5
+
+    while game_state == 1 and territories_remaining > 0:
+        for player in game.players:
+            territory_selected = False
+            if territories_remaining > 0:
+                print(f"{player.name} please select a territory")
+                while not territory_selected:
+                    for event in pygame.event.get():
+                        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                            mouse_pos = pygame.mouse.get_pos()
+                            for territory_name, territory in game.board.territories.items():
+                                if territory.click(mouse_pos):
+                                    if territory.owner is None:
+                                        territory.owner = player
+                                        player.territories.append(territory)
+                                        territory.soldierNumber += 1  # Increment the number of soldiers
+                                        print(f"{player.name} picked {territory.name}")
+                                        territories_remaining -= 1
+                                        print(f"territories remaining: {territories_remaining}")
+                                        territory_selected = True
+                                        edit_screen()
+                                        break
+                                    elif territory.owner == player:
+                                        print(f"You already own {territory.name}, please choose an empty territory")
+                                        continue
+                                    # elif territory.owner == player:
+                                    #     territory.soldierNumber += 1
+                                    #     print(f"{player.name} added a soldier to {territory.name}")
+                                    #     territory_selected = True
+                                    #     edit_screen()
+                                    #     break
+                                    else:
+                                        print(f"{territory.name} has already been chosen by {territory.owner.name}")
+                                        continue
+        if territories_remaining == 0:
+            break
 
     # Clear the screen
     screen.fill((255, 255, 255))  # Fill with white background
 
-    # Draw the butterfly
+    # Draw the territories
     game.board.territories["qatar"].draw(screen)
     game.board.territories["afghanistan"].draw(screen)
     game.board.territories["saudi_arabia"].draw(screen)
+    game.board.territories["iran"].draw(screen)
+    game.board.territories["egypt"].draw(screen)
 
     # Update the display
     pygame.display.flip()
