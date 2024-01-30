@@ -125,9 +125,16 @@ while running:
                                     else:
                                         print(f"{territory.name} has already been chosen by {territory.owner.name}")
                                         continue
-        if territories_remaining == 0:
-            break
+                if territories_remaining == 0:
+                    game_state = 2
+                    break
 
+    while game_state == 2:
+        for player in game.players:
+            territory_selected = False
+            if player.soldiers_in_hand > 0:
+                print (f"{player.name}, please select a territory that you own to add a soldier to:")
+                while not territory_selected
     # Clear the screen
     screen.fill((255, 255, 255))  # Fill with white background
 
