@@ -107,6 +107,7 @@ while running:
                                         territory.owner = player
                                         player.territories.append(territory)
                                         territory.soldierNumber += 1  # Increment the number of soldiers
+                                        player.soldiers_in_hand -= 1
                                         print(f"{player.name} picked {territory.name}")
                                         territories_remaining -= 1
                                         print(f"territories remaining: {territories_remaining}")
@@ -129,12 +130,39 @@ while running:
                     game_state = 2
                     break
 
+    players_remaining = len(game.players)
+
     while game_state == 2:
         for player in game.players:
             territory_selected = False
+            if player.soldiers_in_hand == 0:
+                players_remaining -= 1
             if player.soldiers_in_hand > 0:
-                print (f"{player.name}, please select a territory that you own to add a soldier to:")
-                while not territory_selected
+                print(f"{player.name}, please select a territory that you own to add a soldier to:")
+                while not territory_selected:
+                    for event in pygame.event.get():
+                        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                            mouse_pos = pygame.mouse.get_pos()
+                            for territory_name, territory in game.board.territories.items():
+                                if territory.click(mouse_pos):
+                                    if territory.owner is player:
+                                        territory.soldierNumber += 1
+                                        player.soldiers_in_hand -= 1
+                                        print(f"{player.name} added a soldier to {territory.name}")
+                                        print(f"{player.name}, soldiers remaining: {player.soldiers_in_hand}")
+                                        territory_selected = True
+                                        edit_screen()
+                                        break
+                                    elif territory.owner is not player:
+                                        print(f"{territory.name} is owned by {territory.owner.name}. You can not add soldiers to a territory you don't own")
+                                        continue
+            if players_remaining <= 0:
+                game_state = 3
+                break
+
+    while game_state == 3:
+        for player in game.players:
+            reinforcements = player.reinforcment_calculator()
     # Clear the screen
     screen.fill((255, 255, 255))  # Fill with white background
 
