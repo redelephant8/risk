@@ -162,7 +162,33 @@ while running:
 
     while game_state == 3:
         for player in game.players:
-            reinforcements = player.reinforcment_calculator()
+            print(f"It is {player.name}'s turn. Stage 1: Receiving and Placing Reinforcements")
+            player.soldiers_in_hand = player.reinforcement_calculator()
+            print(f"{player.name}, you have been awarded {player.soldiers_in_hand} to place")
+            while player.soldiers_in_hand > 0:
+                territory_selected = False
+                print(f"{player.name}, please select a territory to add a soldier to.")
+                while not territory_selected:
+                    for event in pygame.event.get():
+                        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                            mouse_pos = pygame.mouse.get_pos()
+                            for territory_name, territory in game.board.territories.items():
+                                if territory.click(mouse_pos):
+                                    if territory.owner is player:
+                                        territory.soldierNumber += 1
+                                        player.soldiers_in_hand -= 1
+                                        print(f"{player.name} added a soldier to {territory.name}")
+                                        print(f"{player.name}, soldiers remaining: {player.soldiers_in_hand}")
+                                        territory_selected = True
+                                        edit_screen()
+                                        break
+                                    elif territory.owner is not player:
+                                        print(
+                                            f"{territory.name} is owned by {territory.owner.name}. You can not add soldiers to a territory you don't own")
+                                        continue
+            print("Stage 2: Combat")
+
+
     # Clear the screen
     screen.fill((255, 255, 255))  # Fill with white background
 
