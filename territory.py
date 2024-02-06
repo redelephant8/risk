@@ -24,3 +24,14 @@ class Territory:
         font = pygame.font.Font(None, 36)
         text = font.render(str(self.soldierNumber), True, (0, 0, 0))
         screen.blit(text, (self.coordinates[0] + 10, self.coordinates[1] + 10))
+
+    def check_neighbors(self, player):
+        flag = False
+        for neighbor in self.neighbors:
+            if neighbor.owner != player:
+                flag = True
+        return flag
+
+    def draw_lines_to_neighbors(self, screen):
+        for neighbor in self.neighbors:
+            pygame.draw.line(screen, (0, 0, 0), self.coordinates, neighbor.coordinates, 2)
