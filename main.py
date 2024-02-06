@@ -15,11 +15,31 @@ def edit_screen():
     screen.fill((255, 255, 255))  # Fill with white background
 
     # Draw the territories
+    # Draw the territories
     game.board.territories["qatar"].draw(screen)
+    game.board.territories["qatar"].draw_lines_to_neighbors(screen)
+
     game.board.territories["afghanistan"].draw(screen)
+    game.board.territories["afghanistan"].draw_lines_to_neighbors(screen)
+
     game.board.territories["saudi_arabia"].draw(screen)
+    game.board.territories["saudi_arabia"].draw_lines_to_neighbors(screen)
+
     game.board.territories["iran"].draw(screen)
+    game.board.territories["iran"].draw_lines_to_neighbors(screen)
+
     game.board.territories["egypt"].draw(screen)
+    game.board.territories["egypt"].draw_lines_to_neighbors(screen)
+
+    # Draw the button
+    button_rect = pygame.Rect(600, 500, 150, 50)  # Button position and size
+    pygame.draw.rect(screen, (0, 0, 255), button_rect)  # Draw the button
+
+    # Add text to the button
+    font = pygame.font.SysFont(None, 30)
+    text = font.render("End Combat", True, (255, 255, 255))
+    text_rect = text.get_rect(center=button_rect.center)
+    screen.blit(text, text_rect)
 
     # Update the display
     pygame.display.flip()
@@ -81,10 +101,30 @@ while running:
 
     # Draw the territories
     game.board.territories["qatar"].draw(screen)
+    game.board.territories["qatar"].draw_lines_to_neighbors(screen)
+
     game.board.territories["afghanistan"].draw(screen)
+    game.board.territories["afghanistan"].draw_lines_to_neighbors(screen)
+
     game.board.territories["saudi_arabia"].draw(screen)
+    game.board.territories["saudi_arabia"].draw_lines_to_neighbors(screen)
+
     game.board.territories["iran"].draw(screen)
+    game.board.territories["iran"].draw_lines_to_neighbors(screen)
+
     game.board.territories["egypt"].draw(screen)
+    game.board.territories["egypt"].draw_lines_to_neighbors(screen)
+
+
+    # Draw the button
+    button_rect = pygame.Rect(600, 500, 150, 50)  # Button position and size
+    pygame.draw.rect(screen, (0, 0, 255), button_rect)  # Draw the button
+
+    # Add text to the button
+    font = pygame.font.SysFont(None, 30)
+    text = font.render("End Combat", True, (255, 255, 255))
+    text_rect = text.get_rect(center=button_rect.center)
+    screen.blit(text, text_rect)
 
     # Update the display
     pygame.display.flip()
@@ -187,6 +227,48 @@ while running:
                                             f"{territory.name} is owned by {territory.owner.name}. You can not add soldiers to a territory you don't own")
                                         continue
             print("Stage 2: Combat")
+            combat_stage = True
+            while combat_stage:
+                print(f"{player.name}, please select a territory you would like to attack with. If you would like to end the combat stage, press End Combat")
+                territory_selected = False
+                attacking_territory = None
+                defending_territory = None
+                while not territory_selected:
+                    if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                        mouse_pos = pygame.mouse.get_pos()
+                        for territory_name, territory in game.board.territories.items():
+                            if territory.click(mouse_pos):
+                                if territory.owner is player:
+                                    if territory.soldierNumber > 1:
+                                        if territory.check_neighbors(player):
+                                            attacking_territory = territory
+                                            territory_selected = True
+                                        else:
+                                            print("There are no neighboring territories to attack")
+                                    else:
+                                        print("You can not attack with a territory that has less than 2 soldiers")
+                                else:
+                                    print("You must select one of your own territories to attack with")
+                if attacking_territory is not None:
+                    territory_selected = False
+                    while not territory_selected:
+                        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                            mouse_pos = pygame.mouse.get_pos()
+                            for territory_name, territory in game.board.territories.items():
+                                if territory.click(mouse_pos):
+                                    if territory.owner in attacking_territory.neighbors:
+                                        if territory.owner is not player:
+                                            defending_territory = territory
+                                            territory_selected = True
+                                        else:
+                                            print("You can't attack your own territory")
+                                    else:
+                                        print("You must attack a neighboring territory")
+                    if defending_territory is not None:
+                        print(f"New Battle: {player} is attacking {defending_territory.name} with {attacking_territory.name}")
+                        print(f"Each side must now roll their dice to decide the outcome of this battle: ")
+
+
 
 
     # Clear the screen
