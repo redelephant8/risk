@@ -1,5 +1,6 @@
 import pygame
 import sys
+import random
 
 from territory import Territory
 from player import Player
@@ -9,6 +10,22 @@ game_state = 0
 width, height = 800, 600
 screen = pygame.display.set_mode((width, height))
 pygame.display.set_caption("Risk")
+
+DICE_SIZE = 50
+DICE_OFFSET_X = 50
+DICE_OFFSET_Y = 50
+DICE_IMAGES = {
+    1: pygame.image.load("dice_white_1.png"),
+    2: pygame.image.load("dice_white_2.png"),
+    3: pygame.image.load("dice_white_3.png"),
+    4: pygame.image.load("dice_white_4.png"),
+    5: pygame.image.load("dice_white_5.png"),
+    6: pygame.image.load("dice_white_6.png"),
+}
+
+def draw_dice(screen, value, x, y):
+    screen.blit(DICE_IMAGES[value], (x, y))
+
 
 def edit_screen():
     # Clear the screen
@@ -245,10 +262,13 @@ while running:
                                             territory_selected = True
                                         else:
                                             print("There are no neighboring territories to attack")
+                                            continue
                                     else:
                                         print("You can not attack with a territory that has less than 2 soldiers")
+                                        continue
                                 else:
                                     print("You must select one of your own territories to attack with")
+                                    continue
                 if attacking_territory is not None:
                     territory_selected = False
                     while not territory_selected:
@@ -262,12 +282,33 @@ while running:
                                             territory_selected = True
                                         else:
                                             print("You can't attack your own territory")
+                                            continue
                                     else:
                                         print("You must attack a neighboring territory")
+                                        continue
                     if defending_territory is not None:
                         print(f"New Battle: {player} is attacking {defending_territory.name} with {attacking_territory.name}")
                         print(f"Each side must now roll their dice to decide the outcome of this battle: ")
 
+                        # Roll dice for attacker and defender
+                        attacker_dice = [random.randint(1, 6) for _ in
+                                         range(min(attacking_territory.soldierNumber - 1, 3))]
+                        defender_dice = [random.randint(1, 6) for _ in range(min(defending_territory.soldierNumber, 2))]
+
+                        # Sort the dice rolls
+                        attacker_dice.sort(reverse=True)
+                        defender_dice.sort(reverse=True)
+
+                        print(f"{player.name} rolled: {attacker_dice}")
+                        print(f"{defending_territory.owner.name} rolled: {defender_dice}")
+
+                        # Draw attacker's dice
+                        for i, value in enumerate(attacker_dice):
+                            draw_dice(screen, value, DICE_OFFSET_X + i * DICE_SIZE, DICE_OFFSET_Y)
+
+                        # Draw defender's dice
+                        for i, value in enumerate(defender_dice):
+                            draw_dice(screen, value, width - DICE_OFFSET_X - (i + 1) * DICE_SIZE, DICE_OFFSET_Y)
 
 
 
