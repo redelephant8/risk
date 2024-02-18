@@ -169,32 +169,32 @@ class Game:
                         print(
                             f"{territory.name} is owned by {territory.owner.name}. You can not add soldiers to a territory you don't own")
                         continue
-                        
+
     def receiving_placing_reinforcements(self):
         print(f"It is {self.player.name}'s turn. Stage 1: Receiving and Placing Reinforcements")
         self.player.soldiers_in_hand = self.player.reinforcement_calculator()
         print(f"{self.player.name}, you have been awarded {self.player.soldiers_in_hand} to place")
         while self.player.soldiers_in_hand > 0:
             self.territory_selected = False
-            print(f"{self.playe.name}, please select one of your territories to add a reinforcement to: ")
+            print(f"{self.player.name}, please select one of your territories to add a reinforcement to: ")
             while not self.territory_selected:
                 territory = self.select_territory()
                 if territory.owner is self.player:
                     territory.soldierNumber += 1
                     self.player.soldiers_in_hand -= 1
+                    print(f"{self.player.name} added a soldier to {territory.name}")
+                    print(f"{self.player.name}, soldiers remaining: {self.player.soldiers_in_hand}")
+                    self.territory_selected = True
+                    edit_screen()
+                elif territory.owner is not self.player:
+                    print(f"{territory.name} is owned by {territory.owner.name}. You cannot add soldiers to a territory you don't own")
                     
-                    #                                     player.soldiers_in_hand -= 1
-                    #                                     print(f"{player.name} added a soldier to {territory.name}")
-                    #                                     print(f"{player.name}, soldiers remaining: {player.soldiers_in_hand}")
-                    #                                     territory_selected = True
-                    #                                     edit_screen()
-                    #                                     break
-                    #                                 elif territory.owner is not player:
-                    #                                     print(
-                    #                                         f"{territory.name} is owned by {territory.owner.name}. You can not add soldiers to a territory you don't own")
-                    #                                     continue
+    def combat_stage(self):
+        attacking_territory = choose_attacking_territory()
+        defending_territory = choose_defending_territory(attacking_territory)
+        
                     
-# running = True
+    
 #
 # while running:
 #     for event in pygame.event.get():
@@ -424,3 +424,4 @@ class Game:
 game = Game()
 game.choosing_initial_territories()
 game.initial_additional_soldier_addition()
+game.receiving_placing_reinforcements()
