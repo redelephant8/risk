@@ -138,11 +138,13 @@ class Game:
     def initial_additional_soldier_addition(self):
         self.player = self.players[0]
         self.player_index = 0
-        players_remaining = len(self.players) - 1
+        players_remaining = len(self.players)
         while players_remaining > 0:
             print(f"{self.player.name} YOUR TURN MY GUY")
+            print(f"{self.player.name}, is out: {self.player.isOut}")
+            print("Players remaining: " + str(players_remaining))
             self.territory_selected = False
-            if self.player.isOut is False:
+            if self.player.isOut is True:
                 self.change_current_player()
             # if self.player.soldiers_in_hand < 1 and self.player.isOut is False:
             #     players_remaining -= 1
@@ -158,7 +160,7 @@ class Game:
                         print(f"{self.player.name} added a soldier to {territory.name}")
                         print(f"{self.player.name}, soldiers remaining: {self.player.soldiers_in_hand}")
                         self.territory_selected = True
-                        if self.player.soldiers_in_hand < 0:
+                        if self.player.soldiers_in_hand <= 0:
                             players_remaining -= 1
                             self.player.isOut = True
                         edit_screen()
