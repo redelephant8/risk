@@ -78,6 +78,7 @@ class Game:
         self.board = Board()
         self.game_state = 0
         self.territory_selected = False
+        self.combat_stage_flag = False
 
     def change_current_player(self):
         i = self.player_index
@@ -95,7 +96,6 @@ class Game:
 
     def select_territory(self):
         edit_screen()
-        print("select a territory, bitch")
         selection_valid = False
         selected_territory = None
         while not selection_valid:
@@ -107,6 +107,12 @@ class Game:
                             selected_territory = territory
                             selection_valid = True
                             edit_screen()
+                        button_rect = pygame.Rect(600, 500, 150, 50)
+                        if button_rect.collidepoint(mouse_pos):
+                            selected_territory = "End"
+                            selection_valid = True
+                            edit_screen()
+                            self.combat_stage_flag = False
         return selected_territory
 
     def choosing_initial_territories(self):
@@ -188,13 +194,83 @@ class Game:
                     edit_screen()
                 elif territory.owner is not self.player:
                     print(f"{territory.name} is owned by {territory.owner.name}. You cannot add soldiers to a territory you don't own")
-                    
+
+    def choose_attacking_territory(self):
+        print(f"{self.player.name}, please select a territory you would like to attack with. If you would like to end the combat stage, press End Combat")
+        self.territory_selected = False
+        while not self.territory_selected:
+            territory = self.select_territory()
+            if territory == "End":
+                return territory
+            if territory.owner is self.player:
+                if territory.soldierNumber > 1:
+                    if territory.check_neighbors(self.player):
+                        print(f"Selected territory: {territory.name}")
+                        return territory
+                    else:
+                        print("There are no neighboring territories to attack")
+                        continue
+                else:
+                    print("You cannot attack with a territory that has less than 2 soldiers")
+                    continue
+            else:
+                print("You must select one of your own territories to attack with")
+                continue
+
+    def choose_defending_territory(self, attacking_territory):
+        self.territory_selected = False
+        while not self.territory_selected:
+            territory = self.select_territory()
+            if territory == "End":
+                return territory
+            if territory in attacking_territory.neighbors:
+                if territory.owner is not self.player:
+                    return territory
+                else:
+                    print("You can't attack your own territory")
+                    continue
+            else:
+                print("You must attack a neighboring territory")
+                continue
+
     def combat_stage(self):
-        attacking_territory = choose_attacking_territory()
-        defending_territory = choose_defending_territory(attacking_territory)
+        self.combat_stage_flag = True
+        while self.combat_stage_flag:
+            attacking_territory = self.choose_attacking_territory()
+            if attacking_territory == "End":
+                continue
+            defending_territory = self.choose_defending_territory(attacking_territory)
+            if defending_territory == "End":
+                continue
+            print(f"New Battle: {self.player} is attacking {defending_territory.name} with {attacking_territory.name}")
+            # Roll dice for attacker and defender
+            attacker_dice = [random.randint(1, 6) for _ in
+                             range(min(attacking_territory.soldierNumber - 1, 3))]
+            defending_number = 2
+            if defending_territory.soldierNumber == 1:
+                defending_number = 1
+            defender_dice = [random.randint(1, 6) for _ in range(min(defending_territory.soldierNumber, defending_number))]
+
+            # Sort the dice rolls
+            attacker_dice.sort(reverse=True)
+            defender_dice.sort(reverse=True)
+
+            print(f"{self.player.name} rolled: {attacker_dice}")
+            print(f"{defending_territory.owner.name} rolled: {defender_dice}")
+
+            # Draw attacker's dice
+            for i, value in enumerate(attacker_dice):
+                draw_dice(screen, value, DICE_OFFSET_X + i * DICE_SIZE, DICE_OFFSET_Y)
+
+            # Draw defender's dice
+            for i, value in enumerate(defender_dice):
+                draw_dice(screen, value, width - DICE_OFFSET_X - (i + 1) * DICE_SIZE, DICE_OFFSET_Y)
         
-                    
-    
+        
+    def 
+
+
+
 #
 # while running:
 #     for event in pygame.event.get():
@@ -424,4 +500,8 @@ class Game:
 game = Game()
 game.choosing_initial_territories()
 game.initial_additional_soldier_addition()
-game.receiving_placing_reinforcements()
+
+while True:
+    game.receiving_placing_reinforcements()
+    game.combat_stage()
+    game.change_current_player()
