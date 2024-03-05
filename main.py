@@ -138,8 +138,8 @@ def end_combat_popup(screen):
 class Game:
     def __init__(self):
         player1 = Player("Red", "Elad")
-        player2 = Player("Pink", "Ben")
-        player3 = Player("Yellow", "Orian")
+        player2 = Player("Indigo", "Ben")
+        player3 = Player("Teal", "Orian")
         self.players = [player1, player2, player3]
         self.player = self.players[0]
         self.player_index = 0
@@ -190,6 +190,7 @@ class Game:
         while territories_remaining > 0:
             self.territory_selected = False
             print(f"{self.player.name} please select a territory")
+            edit_screen(f"{self.player.name} please select a territory")
             while not self.territory_selected:
                 territory = self.select_territory()
                 if territory.owner is None:
@@ -228,6 +229,7 @@ class Game:
             #     self.change_current_player()
             if self.player.soldiers_in_hand > 0:
                 print(f"{self.player.name}, please select a territory that you own to add a soldier to:")
+                edit_screen(f"{self.player.name}, please select a territory that you own to add a soldier to:")
                 while not self.territory_selected:
                     territory = self.select_territory()
                     if territory.owner is self.player:
@@ -247,13 +249,14 @@ class Game:
                         continue
 
     def receiving_placing_reinforcements(self):
-        edit_screen()
         print(f"It is {self.player.name}'s turn. Stage 1: Receiving and Placing Reinforcements")
         self.player.soldiers_in_hand = self.player.reinforcement_calculator()
         print(f"{self.player.name}, you have been awarded {self.player.soldiers_in_hand} to place")
+        edit_screen(f"{self.player.name}, you have been awarded {self.player.soldiers_in_hand} to place.\n please select one of your territories to add a reinforcement to: ")
         while self.player.soldiers_in_hand > 0:
             self.territory_selected = False
             print(f"{self.player.name}, please select one of your territories to add a reinforcement to: ")
+            edit_screen(f"{self.player.name}, please select one of your territories to add a reinforcement to: ")
             while not self.territory_selected:
                 territory = self.select_territory()
                 if territory.owner is self.player:
@@ -279,6 +282,10 @@ class Game:
                     if territory.check_neighbors(self.player):
                         print(f"Selected territory: {territory.name}")
                         num_soldiers_options = ["1 Soldier", "2 Soldiers", "3 Soldiers"]
+                        if territory.soldierNumber == 2:
+                            num_soldiers_options = ["1 Soldier"]
+                        elif territory.soldierNumber == 3:
+                            num_soldiers_options = ["1 Soldier", "2 Soldiers"]
                         num_soldiers_index = create_popup(screen, "Select number of soldiers to send:",
                                                           num_soldiers_options)
                         return territory, num_soldiers_index + 1  # Add 1 to convert index to number of soldiers
@@ -340,7 +347,7 @@ class Game:
             if defending_territory.soldierNumber < 1:
                 edit_screen()
                 defending_territory.owner = attacking_territory.owner
-                transfer_options = [str(i) for i in range(1, attacking_territory.soldierNumber - 1)]
+                transfer_options = [str(i) for i in range(1, attacking_territory.soldierNumber)]
                 transfer_result = create_popup(screen, "How many soldiers will you move over", transfer_options)
                 defending_territory.soldierNumber = transfer_result + 1
                 attacking_territory.soldierNumber -= transfer_result + 1
