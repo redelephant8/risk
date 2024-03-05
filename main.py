@@ -337,6 +337,14 @@ class Game:
             attacker_losses, defender_losses = self.combat_losses(attacker_dice, defender_dice)
             attacking_territory.soldierNumber -= attacker_losses
             defending_territory.soldierNumber -= defender_losses
+            if defending_territory.soldierNumber < 1:
+                edit_screen()
+                defending_territory.owner = attacking_territory.owner
+                transfer_options = [str(i) for i in range(1, attacking_territory.soldierNumber - 1)]
+                transfer_result = create_popup(screen, "How many soldiers will you move over", transfer_options)
+                defending_territory.soldierNumber = transfer_result + 1
+                attacking_territory.soldierNumber -= transfer_result + 1
+                edit_screen()
             edit_screen()
 
             # Draw attacker's dice
