@@ -33,7 +33,6 @@ def edit_screen(message=None):
     screen.fill((255, 255, 255))  # Fill with white background
 
     # Draw the territories
-    # Draw the territories
     game.board.territories["qatar"].draw(screen)
     game.board.territories["qatar"].draw_lines_to_neighbors(screen)
 
@@ -139,7 +138,7 @@ class Game:
     def __init__(self):
         player1 = Player("Red", "Elad")
         player2 = Player("Indigo", "Ben")
-        player3 = Player("Teal", "Orian")
+        player3 = Player("Yellow", "Orian")
         self.players = [player1, player2, player3]
         self.player = self.players[0]
         self.player_index = 0
@@ -177,9 +176,10 @@ class Game:
                             selection_valid = True
                             edit_screen()
                         button_rect = pygame.Rect(600, 500, 150, 50)
-                        if button_rect.collidepoint(mouse_pos):
-                            selected_territory = "End"
+                        if button_rect.collidepoint(mouse_pos) and self.combat_stage_flag is True:
+                            selected_territory = None
                             selection_valid = True
+                            print("BENSAVIRISBEHINDME")
                             edit_screen()
                             self.combat_stage_flag = False
         return selected_territory
@@ -205,9 +205,11 @@ class Game:
                     edit_screen()
                     self.change_current_player()
                 elif territory.owner == self.player:
+                    edit_screen(f"You already own {territory.name}. please choose an empty territory")
                     print(f"You already own {territory.name}. please choose an empty territory")
                     continue
                 else:
+                    edit_screen(f"{territory.name} has already been chosen by {territory.owner.name}")
                     print(f"{territory.name} has already been chosen by {territory.owner.name}")
                     continue
                 edit_screen()
@@ -244,6 +246,7 @@ class Game:
                         edit_screen()
                         self.change_current_player()
                     elif territory.owner is not self.player:
+                        edit_screen(f"{territory.name} is owned by {territory.owner.name}. You can not add soldiers to a territory you don't own")
                         print(
                             f"{territory.name} is owned by {territory.owner.name}. You can not add soldiers to a territory you don't own")
                         continue
@@ -267,6 +270,7 @@ class Game:
                     self.territory_selected = True
                     edit_screen()
                 elif territory.owner is not self.player:
+                    edit_screen(f"{territory.name} is owned by {territory.owner.name}. You cannot add soldiers to a territory you don't own")
                     print(f"{territory.name} is owned by {territory.owner.name}. You cannot add soldiers to a territory you don't own")
 
     def choose_attacking_territory(self):
@@ -275,8 +279,8 @@ class Game:
         self.territory_selected = False
         while not self.territory_selected:
             territory = self.select_territory()
-            if territory == "End":
-                return territory
+            if territory is None:
+                return territory, 0
             if territory.owner is self.player:
                 if territory.soldierNumber > 1:
                     if territory.check_neighbors(self.player):
@@ -290,12 +294,15 @@ class Game:
                                                           num_soldiers_options)
                         return territory, num_soldiers_index + 1  # Add 1 to convert index to number of soldiers
                     else:
+                        edit_screen("There are no neighboring territories to attack")
                         print("There are no neighboring territories to attack")
                         continue
                 else:
+                    edit_screen("You cannot attack with a territory that has less than 2 soldiers")
                     print("You cannot attack with a territory that has less than 2 soldiers")
                     continue
             else:
+                edit_screen("You must select one of your own territories to attack with")
                 print("You must select one of your own territories to attack with")
                 continue
 
@@ -304,15 +311,17 @@ class Game:
         self.territory_selected = False
         while not self.territory_selected:
             territory = self.select_territory()
-            if territory == "End":
+            if territory is None:
                 return territory
             if territory in attacking_territory.neighbors:
                 if territory.owner is not self.player:
                     return territory
                 else:
+                    edit_screen("You can't attack your own territory")
                     print("You can't attack your own territory")
                     continue
             else:
+                edit_screen("You must attack a neighboring territory")
                 print("You must attack a neighboring territory")
                 continue
 
@@ -320,11 +329,11 @@ class Game:
         self.combat_stage_flag = True
         while self.combat_stage_flag:
             attacking_territory, num_attacking_soldiers = self.choose_attacking_territory()
-            if attacking_territory == "End":
-                continue
+            if attacking_territory is None:
+                break
             defending_territory = self.choose_defending_territory(attacking_territory)
-            if defending_territory == "End":
-                continue
+            if defending_territory is None:
+                break
             print(f"New Battle: {self.player} is attacking {defending_territory.name} with {attacking_territory.name}")
             # Roll dice for attacker and defender
             attacker_dice = [random.randint(1, 6) for _ in
@@ -392,6 +401,9 @@ game.choosing_initial_territories()
 game.initial_additional_soldier_addition()
 
 while True:
+    if len(game.player.territories) < 1:
+        game.change_current_player()
+        continue
     game.receiving_placing_reinforcements()
     game.combat_stage()
     game.change_current_player()
