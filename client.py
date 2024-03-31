@@ -1,101 +1,71 @@
-# server.py
+# client.py
 
 import socket
-import threading
 import pickle
+import pygame
+from networkGame import Game
 
-class RiskServer:
-    def __init__(self, host, port):
+
+class RiskClient:
+    def __init__(self, host, port, player_name):
         self.host = host
         self.port = port
-        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.connections = []  # Store client connections
-        self.game_state = {
-            "board": {
-                "territories": {
-                    # Initialize territories here
-                }
-            },
-            "current_player": None
-        }
-        self.game_host = None
+        self.player_name = player_name
+        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.game_state = {}  # Store game state
 
     def start(self):
-        self.server_socket.bind((self.host, self.port))
-        self.server_socket.listen()
+        game_state = 0
+        width, height = 800, 600
+        screen = pygame.display.set_mode((width, height))
+        pygame.display.set_caption("Risk")
+        game = Game()
+        game.choosing_initial_territories()
 
-        print(f"Server is listening on {self.host}:{self.port}")
 
-        while True:
-            client_socket, client_address = self.server_socket.accept()
-            self.connections.append(client_socket)
-            print(f"New connection from {client_socket.getpeername()}")
+        self.client_socket.connect((self.host, self.port))
+        print(f"Connected to server {self.host}:{self.port}")
 
-            if not self.game_host:
-                self.game_host = client_address
-                print(f"{client_address} is the host of the game.")
-
-            # Start a new thread to handle client communication
-            client_thread = threading.Thread(target=self.handle_client, args=(client_socket,))
-            client_thread.start()
-
-    def handle_client(self, client_socket):
         while True:
             try:
-                data = client_socket.recv(1024)
+                # Receive game state updates from server
+                data = self.client_socket.recv(1024)
                 if not data:
                     break
 
-                # Process received data
-                message = pickle.loads(data)
-                message_type = message.get("type")
+                # Process received game state
+                self.game_state = pickle.loads(data)
+                self.update_screen()
 
-                if message_type == "territory_selection":
-                    self.handle_territory_selection(message)
+                # Check if it's this player's turn
+                if self.game_state.get("current_player") == self.player_name:
+                    self.select_territory()
 
             except Exception as e:
-                print(f"Error handling client: {e}")
+                print(f"Error in client: {e}")
                 break
 
-        # Client disconnected
-        print(f"Client {client_socket.getpeername()} disconnected")
-        self.connections.remove(client_socket)
-        client_socket.close()
+        self.client_socket.close()
 
-    def handle_territory_selection(self, message):
-        player = message["player"]
-        territory = message["territory"]
-        if self.game_state["current_player"] == player:
-            # Update game state
-            self.game_state["board"]["territories"][territory]["owner"] = player
-            # Example: Increment player's territories count
-            self.game_state[player]["territories_count"] += 1
+    def update_screen(self):
+        # Implement code to update the screen based on game state
+        pass
 
-            # Inform next player it's their turn
-            self.next_player_turn()
-
-            # Broadcast updated game state to all clients
-            self.broadcast(self.game_state)
-
-    def next_player_turn(self):
-        # Determine next player and update game state
-        # For example:
-        current_player_index = self.game_state["players"].index(self.game_state["current_player"])
-        next_player_index = (current_player_index + 1) % len(self.game_state["players"])
-        self.game_state["current_player"] = self.game_state["players"][next_player_index]
-
-    def broadcast(self, data):
-        for connection in self.connections:
-            try:
-                connection.sendall(pickle.dumps(data))
-            except Exception as e:
-                print(f"Error broadcasting to {connection.getpeername()}: {e}")
-                connection.close()
-                self.connections.remove(connection)
-
+    def select_territory(self):
+        while True:
+            for event in pygame.event.get():
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    mouse_pos = pygame.mouse.get_pos()
+                    for territory_name, territory in self.game_state["board"]["territories"].items():
+                        if territory["rect"].collidepoint(mouse_pos):
+                            # Send selected territory to server
+                            message = {"type": "territory_selection", "player": self.player_name, "territory": territory_name}
+                            self.client_socket.sendall(pickle.dumps(message))
+                            return
 
 if __name__ == "__main__":
     HOST = "10.116.3.115"  # Change this to your server's IP address
-    PORT = 8080  # Choose a suitable port
-    server = RiskServer(HOST, PORT)
-    server.start()
+    PORT = 8080  # Choose the same port as the server
+    player_name = input("Enter your player name: ")
+    client = RiskClient(HOST, PORT, player_name)
+    client.start()
