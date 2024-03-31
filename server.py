@@ -95,7 +95,7 @@ class RiskServer:
 
 
 if __name__ == "__main__":
-    HOST = "192.168.86.148"  # Change this to your server's IP address
+    HOST = "10.116.3.115"  # Change this to your server's IP address
     PORT = 8080  # Choose a suitable port
     server = RiskServer(HOST, PORT)
     server.start()
