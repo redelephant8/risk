@@ -148,6 +148,13 @@ class RiskClient:
         for i, player_name in enumerate(self.player_list):
             draw_text(player_name, font, (0, 0, 0), screen, 300, 100 + i * 40)
 
+        # Check if the client is the host and there are at least three clients including the host
+        if self.is_host and len(self.player_list) >= 2:
+            # Display "Start Game" button
+            start_button = pygame.Rect(250, 100 + len(self.player_list) * 40, 200, 50)
+            pygame.draw.rect(screen, (0, 255, 0), start_button)
+            draw_text("Start Game", font, (0, 0, 0), screen, start_button.x + 50, start_button.y + 15)
+
         pygame.display.flip()  # Update the display
 
         pygame.time.Clock().tick(30)  # Limit frame rate to 30 FPS
