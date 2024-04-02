@@ -2,6 +2,7 @@ import socket
 import threading
 import pickle
 import time
+from board import Board
 
 class RiskServer:
     def __init__(self, host, port):
@@ -17,6 +18,7 @@ class RiskServer:
             },
             "current_player": None
         }
+        self.board = Board()
         self.player_list = []
         self.game_host = None
 
@@ -28,6 +30,7 @@ class RiskServer:
 
         while True:
             client_socket, client_address = self.server_socket.accept()
+            #HERE ADD TO BLOCK MORE THAN 6 CLIENTS JOINING
             self.connections.append(client_socket)
             print(f"New connection from {client_socket.getpeername()}")
 
@@ -64,6 +67,13 @@ class RiskServer:
                     time.sleep(0.1)
                     self.broadcast({"type": "player_list", "message": self.player_list})
 
+                if message_type == "start_game":
+                    print("Host started game")
+                    time.sleep(0.1)
+                    print(self.board)
+                    packed_territory_info = self.pack_territory_info()
+                    self.broadcast(({"type": "start_game", "territory_info": packed_territory_info}))
+
             except Exception as e:
                 print(f"Error handling client: {e}")
                 break
@@ -73,6 +83,11 @@ class RiskServer:
         self.connections.remove(client_socket)
         client_socket.close()
 
+    def pack_territory_info(self):
+        packed_territory_info = {}
+        for territory_name, territory in self.board.territories.items():
+            packed_territory_info[territory_name] = [territory.owner, territory.soldierNumber]
+        return packed_territory_info
     def broadcast(self, data):
         for connection in self.connections:
             try:
