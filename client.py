@@ -39,6 +39,7 @@ class RiskClient:
             try:
                 # Receive messages from the server
                 data = self.client_socket.recv(1024)
+                print("I received new data!!!!")
                 if not data:
                     break
 
@@ -61,6 +62,9 @@ class RiskClient:
                     print(message)
                     print(self.player_list)
                     self.host_wait_screen(screen)
+
+                if message_type == "start_game":
+                    print("We have officially began the risk game.")
 
 
             except Exception as e:
@@ -134,10 +138,23 @@ class RiskClient:
     def host_wait_screen(self, screen):
         font = pygame.font.Font(None, 36)  # Font for rendering text
         print("flipflopflipflop")
+        # Process all events in the event queue
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 return
+
+            # Check for mouse click events
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                mouse_pos = pygame.mouse.get_pos()
+                # Check if the mouse click occurred within the button area
+                if self.is_host and len(self.player_list) >= 2:
+                    start_button = pygame.Rect(250, 100 + len(self.player_list) * 40, 200, 50)
+                    if start_button.collidepoint(mouse_pos):
+                        # Send a message back to the server indicating the start game button was clicked
+                        message = {"type": "start_game"}
+                        self.client_socket.sendall(pickle.dumps(message))
+                        return
 
         screen.fill((255, 255, 255))  # Fill the screen with white color
 
