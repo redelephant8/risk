@@ -3,7 +3,9 @@ import pickle
 import pygame
 from pygame.locals import *
 import threading
+from board import Board
 
+width, height = 800, 600
 def draw_text(text, font, color, surface, x, y):
     text_obj = font.render(text, True, color)
     text_rect = text_obj.get_rect()
@@ -16,10 +18,12 @@ class RiskClient:
         self.port = port
         self.player_name = None
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.game_state = {}  # Store game state
+        self.game_state = "lobby"
         self.player_list = []
         self.prev_player_list = []
         self.is_host = False  # Variable to track whether the player is the host
+        self.board = Board()
+        self.territory_information = {}
 
     def start(self):
         width, height = 800, 600
@@ -49,9 +53,12 @@ class RiskClient:
                             self.start_game()
 
             # Render the lobby screen
-            if self.prev_player_list is not self.player_list:
+            if self.game_state == "lobby" and self.prev_player_list is not self.player_list:
                 self.host_wait_screen(screen)
                 self.prev_player_list = self.player_list
+
+            if self.game_state == "initial_territories":
+                self.edit_screen(screen)
 
             pygame.display.flip()  # Update the display
 
@@ -85,7 +92,10 @@ class RiskClient:
 
                 if message_type == "start_game":
                     print("We have officially began the risk game.")
-
+                    self.territory_information = message.get("territory_info")
+                    print(message.get("territory_info"))
+                    self.update_local_board()
+                    self.game_state = "initial_territories"
         except Exception as e:
             print(f"Error in client: {e}")
 
@@ -178,6 +188,57 @@ class RiskClient:
         message = {"type": "start_game"}
         self.client_socket.sendall(pickle.dumps(message))
         print("Start game message sent to server")
+
+    def update_local_board(self):
+        # for territory_name, territory in self.board.territories.items
+        for territory_name, territory_info in self.territory_information.items():
+            self.board.territories[territory_name].soldierNumber = territory_info[1]
+            self.board.territories[territory_name].name = territory_info[0]
+
+    def edit_screen(self, screen, message=None):
+        # Clear the screen
+        screen.fill((255, 255, 255))  # Fill with white background
+
+        # Draw the territories
+        for territory_name, territory in self.board.territories.items():
+            territory.draw(screen)
+            territory.draw_lines_to_neighbors(screen)
+
+        # game.board.territories["qatar"].draw(screen)
+        # game.board.territories["qatar"].draw_lines_to_neighbors(screen)
+        #
+        # game.board.territories["afghanistan"].draw(screen)
+        # game.board.territories["afghanistan"].draw_lines_to_neighbors(screen)
+        #
+        # game.board.territories["saudi_arabia"].draw(screen)
+        # game.board.territories["saudi_arabia"].draw_lines_to_neighbors(screen)
+        #
+        # game.board.territories["iran"].draw(screen)
+        # game.board.territories["iran"].draw_lines_to_neighbors(screen)
+        #
+        # game.board.territories["egypt"].draw(screen)
+        # game.board.territories["egypt"].draw_lines_to_neighbors(screen)
+
+        # Draw the button
+        button_rect = pygame.Rect(600, 500, 150, 50)  # Button position and size
+        pygame.draw.rect(screen, (0, 0, 255), button_rect)  # Draw the button
+
+        # Add text to the button
+        font = pygame.font.SysFont(None, 30)
+        text = font.render("End Combat", True, (255, 255, 255))
+        text_rect = text.get_rect(center=button_rect.center)
+        screen.blit(text, text_rect)
+
+        if message:
+            text_surface = font.render(message, True, (0, 0, 0))
+            screen.blit(text_surface, (width // 2 - text_surface.get_width() // 2, 20))
+
+        # Update the display
+        pygame.display.flip()
+
+        # Control the frame rate
+        pygame.time.Clock().tick(30)
+
 
 if __name__ == "__main__":
     HOST = "192.168.86.148"  # Change this to your server's IP address
