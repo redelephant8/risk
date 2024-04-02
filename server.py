@@ -1,6 +1,7 @@
 import socket
 import threading
 import pickle
+import time
 
 class RiskServer:
     def __init__(self, host, port):
@@ -60,6 +61,7 @@ class RiskServer:
                     print(f"Connected player name: {message.get('name')}")
                     self.player_list.append(message.get('name'))
                     print(self.player_list)
+                    time.sleep(0.1)
                     self.broadcast({"type": "player_list", "message": self.player_list})
 
             except Exception as e:
@@ -75,7 +77,7 @@ class RiskServer:
         for connection in self.connections:
             try:
                 connection.sendall(pickle.dumps(data))
-                print(f"sent to server {connection.getpeername}")
+                print(f"sent to client {connection.getpeername}")
             except Exception as e:
                 print(f"Error broadcasting to {connection.getpeername()}: {e}")
                 connection.close()
