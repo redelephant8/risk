@@ -1,7 +1,6 @@
 import socket
 import pickle
 import pygame
-import time
 from pygame.locals import *
 import threading
 
@@ -42,6 +41,12 @@ class RiskClient:
             for event in pygame.event.get():  # Event handling loop
                 if event.type == pygame.QUIT:
                     return
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    if self.is_host and len(self.player_list) >= 2:
+                        # Check if the mouse click is within the "Start Game" button
+                        start_button_rect = pygame.Rect(250, 100 + len(self.player_list) * 40, 200, 50)
+                        if start_button_rect.collidepoint(event.pos):
+                            self.start_game()
 
             # Render the lobby screen
             if self.prev_player_list is not self.player_list:
@@ -167,6 +172,12 @@ class RiskClient:
             start_button = pygame.Rect(250, 100 + len(self.player_list) * 40, 200, 50)
             pygame.draw.rect(screen, (0, 255, 0), start_button)
             draw_text("Start Game", font, (0, 0, 0), screen, start_button.x + 50, start_button.y + 15)
+
+    def start_game(self):
+        # Send a message to the server indicating that the game should start
+        message = {"type": "start_game"}
+        self.client_socket.sendall(pickle.dumps(message))
+        print("Start game message sent to server")
 
 if __name__ == "__main__":
     HOST = "192.168.86.148"  # Change this to your server's IP address
