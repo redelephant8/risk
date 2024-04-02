@@ -1,9 +1,9 @@
 import socket
 import pickle
 import pygame
+import time
 from pygame.locals import *
 import threading
-from queue import Queue
 
 def draw_text(text, font, color, surface, x, y):
     text_obj = font.render(text, True, color)
@@ -19,12 +19,11 @@ class RiskClient:
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.game_state = {}  # Store game state
         self.player_list = []
+        self.prev_player_list = []
         self.is_host = False  # Variable to track whether the player is the host
-        self.queue = Queue()  # Queue for communication between threads
 
     def start(self):
         width, height = 800, 600
-        pygame.init()  # Initialize Pygame
         screen = pygame.display.set_mode((width, height))
         pygame.display.set_caption("Risk")
         clock = pygame.time.Clock()  # Create a clock object for controlling FPS
@@ -34,17 +33,28 @@ class RiskClient:
 
         self.get_player_name(screen)
 
-        # Start the Pygame thread
-        pygame_thread = threading.Thread(target=self.pygame_thread, args=(screen,))
-        pygame_thread.start()
+        # Start a separate thread for receiving data from the server
+        receive_thread = threading.Thread(target=self.receive_data)
+        receive_thread.daemon = True
+        receive_thread.start()
 
         while True:
             for event in pygame.event.get():  # Event handling loop
                 if event.type == pygame.QUIT:
-                    pygame.quit()
                     return
 
-            try:
+            # Render the lobby screen
+            if self.prev_player_list is not self.player_list:
+                self.host_wait_screen(screen)
+                self.prev_player_list = self.player_list
+
+            pygame.display.flip()  # Update the display
+
+            clock.tick(30)  # Limit frame rate to 30 FPS
+
+    def receive_data(self):
+        try:
+            while True:
                 # Receive messages from the server
                 data = self.client_socket.recv(1024)
                 print("I received new data!!!!")
@@ -61,21 +71,18 @@ class RiskClient:
                     if message.get("message") == "You are the host.":
                         self.is_host = True  # Set the player as the host
                         print("IJIOJDSOIFJSD, it worked")
-                        self.queue.put(("host_wait_screen", message.get("message")))
 
                 if message_type == "player_list":
                     print("hihihihih")
                     self.player_list = message.get("message")
                     print(message)
                     print(self.player_list)
-                    self.queue.put(("host_wait_screen", message.get("message")))
 
                 if message_type == "start_game":
                     print("We have officially began the risk game.")
 
-            except Exception as e:
-                print(f"Error in client: {e}")
-                break
+        except Exception as e:
+            print(f"Error in client: {e}")
 
     def get_player_name(self, screen):
         pygame.font.init()  # Initialize Pygame font system
@@ -145,25 +152,25 @@ class RiskClient:
         font = pygame.font.Font(None, 36)  # Font for rendering text
         print("flipflopflipflop")
 
-        running = True
-        while running:
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    running = False
+        screen.fill((255, 255, 255))  # Fill the screen with white color
 
-            screen.fill((255, 255, 255))  # Fill the screen with white color
+        # Display title
+        draw_text("Players in the Lobby:", font, (0, 0, 0), screen, 300, 50)
 
-            # Display title
-            draw_text("Players in the Lobby:", font, (0, 0, 0), screen, 300, 50)
+        # Display player names
+        for i, player_name in enumerate(self.player_list):
+            draw_text(player_name, font, (0, 0, 0), screen, 300, 100 + i * 40)
 
-            # Display player names
-            for i, player_name in enumerate(self.player_list):
-                draw_text(player_name, font, (0, 0, 0), screen, 300, 100 + i * 40)
+        # Check if the client is the host and there are at least three clients including the host
+        if self.is_host and len(self.player_list) >= 2:
+            # Display "Start Game" button
+            start_button = pygame.Rect(250, 100 + len(self.player_list) * 40, 200, 50)
+            pygame.draw.rect(screen, (0, 255, 0), start_button)
+            draw_text("Start Game", font, (0, 0, 0), screen, start_button.x + 50, start_button.y + 15)
 
-            # Check if the client is the host and there are at least three clients including the host
-            if self.is_host and len(self.player_list) >= 2:
-                # Display "Start Game" button
-                start_button = pygame.Rect(250, 100 + len(self.player_list) * 40, 200, 50)
-                pygame.draw.rect(screen, (0, 255, 0), start_button)
-                draw_text("Start Game", font, (0, 0, 0), screen, start_button.x + 50, start_button.y + 15)
-
+if __name__ == "__main__":
+    HOST = "192.168.86.148"  # Change this to your server's IP address
+    PORT = 8080  # Choose the same port as the server
+    # player_name = input("Enter your player name: ")
+    client = RiskClient(HOST, PORT)
+    client.start()
