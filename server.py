@@ -3,7 +3,9 @@ import threading
 import pickle
 import time
 from board import Board
+from player import Player
 
+colors = ['red', 'blue', 'yellow', 'green', 'purple', 'pink']
 class RiskServer:
     def __init__(self, host, port):
         self.host = host
@@ -20,7 +22,9 @@ class RiskServer:
         }
         self.board = Board()
         self.player_list = []
+        self.player_names = []
         self.game_host = None
+        self.current_player = None
 
     def start(self):
         self.server_socket.bind((self.host, self.port))
@@ -62,17 +66,34 @@ class RiskServer:
 
                 if message_type == "name_selection":
                     print(f"Connected player name: {message.get('name')}")
-                    self.player_list.append(message.get('name'))
+                    self.player_names.append(message.get('name'))
+                    player_color = colors[0]
+                    self.player_list.append(Player(player_color, message.get('name'), client_socket))
+
+                    # self.player_list[message.get('name')] = Player(colors[0], message.get('name'), client_socket)
+                    colors.pop(0)
                     print(self.player_list)
                     time.sleep(0.1)
-                    self.broadcast({"type": "player_list", "message": self.player_list})
+                    self.broadcast({"type": "player_names", "message": self.player_names, "color": player_color})
 
                 if message_type == "start_game":
                     print("Host started game")
                     time.sleep(0.1)
                     print(self.board)
                     packed_territory_info = self.pack_territory_info()
-                    self.broadcast(({"type": "start_game", "territory_info": packed_territory_info}))
+                    self.switch_player()
+                    self.broadcast(({"type": "start_game", "territory_info": packed_territory_info, "current_player": self.current_player}))
+                    time.sleep(0.1)
+                    # current_player_index = self.player_list.index(self.current_player)
+                    # current_player_connection = self.connections[current_player_index]
+
+                    current_player_connection = self.current_player.connection
+                    self.send_to_client(current_player_connection, {"type": "turn_message"})
+
+                if message_type == "selected_initial_territory":
+                    time.sleep(0.1)
+                    selected_initial_territory = self.board.territories[message.get("territory")]
+                    self.check_selected_initial_territory(selected_initial_territory)
 
             except Exception as e:
                 print(f"Error handling client: {e}")
@@ -105,6 +126,29 @@ class RiskServer:
             print(f"Error sending data to client: {e}")
             client_socket.close()
             self.connections.remove(client_socket)
+
+    def switch_player(self):
+        if self.player_list:
+            if self.current_player is None:
+                self.current_player = self.player_list[0]
+            else:
+                current_idx = self.player_list.index(self.current_player)
+                if current_idx == len(self.player_list) - 1:
+                    self.current_player = self.player_list[0]
+                else:
+                    self.current_player = self.player_list[current_idx + 1]
+
+    def check_selected_initial_territory(self, territory):
+        if territory.owner is None:
+            territory.owner = self.current_player
+            self.current_player.territories.append(territory)
+            territory.soldierNumber += 1
+            self.current_player.soldiers_in_hand -= 1
+        elif territory.owner == self.current_player:
+            self.send_to_client(self.current_player.connection, {"type": "reselect_territory", "message": f"{self.current_player.name}, you already own {territory.name}. Please select a new territory"})
+        else:
+            self.send_to_client(self.current_player.connection, {"type": "reselect_territory", "message": f"{territory.name} has already been chosen by {territory.owner.name}. Please select a new territory"})
+
 
 if __name__ == "__main__":
     HOST = "192.168.86.148"  # Change this to your server's IP address
