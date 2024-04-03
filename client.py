@@ -17,6 +17,7 @@ class RiskClient:
         self.host = host
         self.port = port
         self.player_name = None
+        self.player_color = None
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.game_state = "lobby"
         self.player_list = []
@@ -24,6 +25,10 @@ class RiskClient:
         self.is_host = False  # Variable to track whether the player is the host
         self.board = Board()
         self.territory_information = {}
+        self.current_player = None
+        self.my_turn = False
+        self.territory_selected = False
+        self.player_message = None
 
     def start(self):
         width, height = 800, 600
@@ -60,6 +65,19 @@ class RiskClient:
             if self.game_state == "initial_territories":
                 self.edit_screen(screen)
 
+            # if self.my_turn and self.game_state == "initial_territories":
+            #     self.edit_screen(screen, f"{self.player_name}, please select a territory")
+            #     selected_territory = self.select_territory()
+            #     print(selected_territory)
+            #     message = {"type": "selected_initial_territory", "territory": selected_territory.lower_name}
+            #     self.client_socket.sendall(pickle.dumps(message))
+
+            if self.my_turn and self.game_state == "select_territory":
+                self.edit_screen(screen, self.player_message)
+                selected_territory = self.select_territory()
+                print(selected_territory)
+                message = {"type": "selected_territory", "territory": selected_territory.lower_name}
+                self.client_socket.sendall(pickle.dumps(message))
             pygame.display.flip()  # Update the display
 
             clock.tick(30)  # Limit frame rate to 30 FPS
@@ -84,9 +102,10 @@ class RiskClient:
                         self.is_host = True  # Set the player as the host
                         print("IJIOJDSOIFJSD, it worked")
 
-                if message_type == "player_list":
+                if message_type == "player_names":
                     print("hihihihih")
                     self.player_list = message.get("message")
+                    self.player_color = message.get("color")
                     print(message)
                     print(self.player_list)
 
@@ -95,10 +114,40 @@ class RiskClient:
                     self.territory_information = message.get("territory_info")
                     print(message.get("territory_info"))
                     self.update_local_board()
-                    self.game_state = "initial_territories"
+                    self.game_state = "select_territory"
+                    self.player_message = f"{self.player_name}, please select a territory"
+
+                if message_type == "reselect_territory":
+                    print("I need to reselect my territory")
+                    self.game_state = "select_territory"
+                    self.player_message = message.get("message")
+
+                if message_type == "turn_message":
+                    print("It is my turn")
+                    self.my_turn = True
         except Exception as e:
             print(f"Error in client: {e}")
 
+    def select_territory(self):
+        selection_valid = False
+        selected_territory = None
+        while not selection_valid:
+            for event in pygame.event.get():
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    mouse_pos = pygame.mouse.get_pos()
+                    for territory_name, territory in self.board.territories.items():
+                        if territory.click(mouse_pos):
+                            selected_territory = territory
+                            selection_valid = True
+                            # edit_screen()
+                        button_rect = pygame.Rect(600, 500, 150, 50)
+                        if button_rect.collidepoint(mouse_pos) and self.combat_stage_flag is True:
+                            selected_territory = None
+                            selection_valid = True
+                            print("BENSAVIRISBEHINDME")
+                            # edit_screen()
+                            self.combat_stage_flag = False
+        return selected_territory
     def get_player_name(self, screen):
         pygame.font.init()  # Initialize Pygame font system
         input_box = pygame.Rect(300, 300, 200, 40)
@@ -174,7 +223,7 @@ class RiskClient:
 
         # Display player names
         for i, player_name in enumerate(self.player_list):
-            draw_text(player_name, font, (0, 0, 0), screen, 300, 100 + i * 40)
+            draw_text(player_name[0], font, (0, 0, 0), screen, 300, 100 + i * 40)
 
         # Check if the client is the host and there are at least three clients including the host
         if self.is_host and len(self.player_list) >= 2:
@@ -201,7 +250,7 @@ class RiskClient:
 
         # Draw the territories
         for territory_name, territory in self.board.territories.items():
-            territory.draw(screen)
+            territory.draw(screen, self.player_color)
             territory.draw_lines_to_neighbors(screen)
 
         # game.board.territories["qatar"].draw(screen)
