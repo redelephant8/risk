@@ -133,6 +133,7 @@ class RiskClient:
 
                 if message_type == "reselect_territory":
                     print("I need to reselect my territory")
+                    self.prev_game_state = "None"
                     self.game_state = "select_territory"
                     self.player_message = message.get("message")
 
@@ -246,7 +247,7 @@ class RiskClient:
 
         # Display player names
         for i, player_name in enumerate(self.player_list):
-            draw_text(player_name[0], font, (0, 0, 0), screen, 300, 100 + i * 40)
+            draw_text(player_name, font, (0, 0, 0), screen, 300, 100 + i * 40)
 
         # Check if the client is the host and there are at least three clients including the host
         if self.is_host and len(self.player_list) >= 2:
