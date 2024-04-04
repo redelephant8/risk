@@ -85,7 +85,11 @@ class RiskClient:
                     if self.game_stage == "initial_territories":
                         message = {"type": "selected_initial_territory", "territory": selected_territory.lower_name}
                         self.client_socket.sendall(pickle.dumps(message))
+                    elif self.game_stage == "initial_soldiers":
+                        message = {"type": "selected_initial_soldier_territory", "territory": selected_territory.lower_name}
+                        self.client_socket.sendall(pickle.dumps(message))
                     self.prev_game_state = self.game_state
+
 
                 if self.game_state == "print_board":
                     self.edit_screen(screen, f"It's {self.current_player}'s turn")
@@ -151,6 +155,10 @@ class RiskClient:
                         self.player_message = f"{self.player_name}, please select a territory"
                         self.game_state = "select_territory"
                         self.game_stage = "initial_territories"
+                    elif message.get("turn_type") == "initial_soldier_addition":
+                        self.player_message = f"{self.player_name}, please select a territory that you own to add a soldier to:"
+                        self.game_state = "select_territory"
+                        self.game_stage = "initial_soldiers"
                     self.my_turn = True
         except Exception as e:
             print(f"Error in client: {e}")
