@@ -74,7 +74,9 @@ class RiskServer:
                     colors.pop(0)
                     print(self.player_list)
                     time.sleep(0.1)
-                    self.broadcast({"type": "player_names", "message": self.player_names, "color": player_color})
+                    self.broadcast({"type": "player_names", "message": self.player_names})
+                    self.send_to_client(client_socket, {"type": "player_color", "color": player_color})
+
 
                 if message_type == "start_game":
                     print("Host started game")
@@ -82,7 +84,7 @@ class RiskServer:
                     print(self.board)
                     packed_territory_info = self.pack_territory_info()
                     self.switch_player()
-                    self.broadcast(({"type": "start_game", "territory_info": packed_territory_info, "current_player": self.current_player}))
+                    self.broadcast(({"type": "start_game", "territory_info": packed_territory_info}))
                     time.sleep(0.1)
                     # current_player_index = self.player_list.index(self.current_player)
                     # current_player_connection = self.connections[current_player_index]
@@ -94,6 +96,11 @@ class RiskServer:
                     time.sleep(0.1)
                     selected_initial_territory = self.board.territories[message.get("territory")]
                     self.check_selected_initial_territory(selected_initial_territory)
+                    packed_territory_info = self.pack_territory_info()
+                    print(packed_territory_info)
+                    self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info}))
+
+
 
             except Exception as e:
                 print(f"Error handling client: {e}")
@@ -107,7 +114,10 @@ class RiskServer:
     def pack_territory_info(self):
         packed_territory_info = {}
         for territory_name, territory in self.board.territories.items():
-            packed_territory_info[territory_name] = [territory.owner, territory.soldierNumber]
+            color = "grey"
+            if territory.owner is not None:
+                color = territory.owner.color
+            packed_territory_info[territory_name] = [territory.soldierNumber, color]
         return packed_territory_info
     def broadcast(self, data):
         for connection in self.connections:
