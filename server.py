@@ -103,6 +103,7 @@ class RiskServer:
                         packed_territory_info = self.pack_territory_info()
                         print(packed_territory_info)
                         self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info}))
+                        time.sleep(0.1)
                         self.switch_player()
                         if self.territories_remaining > 0:
                             self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "initial_territory_selection"})
@@ -199,7 +200,7 @@ class RiskServer:
             return False
 
 if __name__ == "__main__":
-    HOST = "192.168.86.148"  # Change this to your server's IP address
+    HOST = "10.116.3.115"  # Change this to your server's IP address
     PORT = 8080  # Choose a suitable port
     server = RiskServer(HOST, PORT)
     server.start()
