@@ -25,6 +25,9 @@ class RiskServer:
         self.player_names = []
         self.game_host = None
         self.current_player = None
+        self.player_number = 0
+        self.players_remaining = 0
+        self.territories_remaining = len(self.board.territories)
 
     def start(self):
         self.server_socket.bind((self.host, self.port))
@@ -61,8 +64,8 @@ class RiskServer:
                 message = pickle.loads(data)
                 message_type = message.get("type")
 
-                if message_type == "territory_selection":
-                    self.handle_territory_selection(message)
+                # if message_type == "territory_selection":
+                #     self.handle_territory_selection(message)
 
                 if message_type == "name_selection":
                     print(f"Connected player name: {message.get('name')}")
@@ -83,6 +86,7 @@ class RiskServer:
                     time.sleep(0.1)
                     print(self.board)
                     packed_territory_info = self.pack_territory_info()
+                    self.player_number = len(self.player_list)
                     self.switch_player()
                     self.broadcast(({"type": "start_game", "territory_info": packed_territory_info}))
                     time.sleep(0.1)
@@ -100,7 +104,22 @@ class RiskServer:
                         print(packed_territory_info)
                         self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info}))
                         self.switch_player()
-                        self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "initial_territory_selection"})
+                        if self.territories_remaining > 0:
+                            self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "initial_territory_selection"})
+                        else:
+                            self.players_remaining = self.player_number
+                            self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "initial_soldier_addition"})
+
+                if message_type == "selected_initial_soldier_territory":
+                    time.sleep(0.1)
+                    selected_initial_soldier_territory = self.board.territories[message.get("territory")]
+                    if self.check_selected_initial_soldier_territory(selected_initial_soldier_territory):
+                        packed_territory_info = self.pack_territory_info()
+                        print(packed_territory_info)
+                        self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info}))
+                        self.switch_player()
+                        if self.players_remaining > 0:
+                            self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "initial_soldier_addition"})
 
 
 
@@ -150,6 +169,7 @@ class RiskServer:
                     self.current_player = self.player_list[0]
                 else:
                     self.current_player = self.player_list[current_idx + 1]
+            self.broadcast({"type": "current_player", "current_player": self.current_player.name})
 
     def check_selected_initial_territory(self, territory):
         if territory.owner is None:
@@ -157,6 +177,7 @@ class RiskServer:
             self.current_player.territories.append(territory)
             territory.soldierNumber += 1
             self.current_player.soldiers_in_hand -= 1
+            self.territories_remaining -= 1
             return True
         elif territory.owner == self.current_player:
             self.send_to_client(self.current_player.connection, {"type": "reselect_territory", "message": f"{self.current_player.name}, you already own {territory.name}. Please select a new territory"})
@@ -165,6 +186,17 @@ class RiskServer:
             self.send_to_client(self.current_player.connection, {"type": "reselect_territory", "message": f"{territory.name} has already been chosen by {territory.owner.name}. Please select a new territory"})
             return False
 
+    def check_selected_initial_soldier_territory(self, territory):
+        if territory.owner is self.current_player:
+            territory.soldierNumber += 1
+            self.current_player.soldiers_in_hand -= 1
+            if self.current_player.soldiers_in_hand <= 0:
+                self.players_remaining -= 1
+                self.current_player.isOut = True
+            return True
+        else:
+            self.send_to_client(self.current_player.connection, {"type": "reselect_territory", "message": f"{territory.name} is owned by {territory.owner.name}. You can not add soldiers to a territory you don't own"})
+            return False
 
 if __name__ == "__main__":
     HOST = "192.168.86.148"  # Change this to your server's IP address
