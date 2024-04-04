@@ -10,11 +10,11 @@ class Board:
         self.setup_neighbors()
 
     def initialize_territories(self):
-        self.territories["qatar"] = Territory("Qatar", 50, 100, "qatar.png")
-        self.territories["egypt"] = Territory("Egypt", 100, 500, "egypt.png")
-        self.territories["iran"] = Territory("Iran", 150, 200, "iran.png")
-        self.territories["saudi_arabia"] = Territory("Saudi Arabia", 200, 500, "saudi_arabia.png")
-        self.territories["afghanistan"] = Territory("Afghanistan", 250, 400, "afghanistan.png")
+        self.territories["qatar"] = Territory("Qatar", "qatar", 50, 100, "qatar.png")
+        self.territories["egypt"] = Territory("Egypt", "egypt", 100, 500, "egypt.png")
+        self.territories["iran"] = Territory("Iran", "iran", 150, 200, "iran.png")
+        self.territories["saudi_arabia"] = Territory("Saudi Arabia", "saudi_arabia", 200, 500, "saudi_arabia.png")
+        self.territories["afghanistan"] = Territory("Afghanistan", "afghanistan", 250, 400, "afghanistan.png")
 
     def setup_neighbors(self):
         self.territories["qatar"].neighbors = [self.territories["egypt"], self.territories["iran"], self.territories["afghanistan"]]
