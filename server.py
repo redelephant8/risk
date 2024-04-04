@@ -42,7 +42,7 @@ class RiskServer:
                 self.game_host = client_address
                 print(f"{client_address} is the host of the game.")
                 # Sending message to the host
-                self.send_to_client(client_socket, {"type": "message", "message": "You are the host."})
+                self.send_to_client(client_socket, {"type": "join_message", "message": "You are the host."})
 
 
                 # Pretty sure this has to be out of this if statement, we'll check soon
@@ -90,7 +90,7 @@ class RiskServer:
                     # current_player_connection = self.connections[current_player_index]
 
                     current_player_connection = self.current_player.connection
-                    self.send_to_client(current_player_connection, {"type": "turn_message"})
+                    self.send_to_client(current_player_connection, {"type": "turn_message", "turn_type": "initial_territory_selection"})
 
                 if message_type == "selected_initial_territory":
                     time.sleep(0.1)
@@ -99,6 +99,9 @@ class RiskServer:
                     packed_territory_info = self.pack_territory_info()
                     print(packed_territory_info)
                     self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info}))
+                    self.switch_player()
+                    self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "initial_territory_selection"})
+
 
 
 
