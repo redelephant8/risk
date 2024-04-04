@@ -95,12 +95,12 @@ class RiskServer:
                 if message_type == "selected_initial_territory":
                     time.sleep(0.1)
                     selected_initial_territory = self.board.territories[message.get("territory")]
-                    self.check_selected_initial_territory(selected_initial_territory)
-                    packed_territory_info = self.pack_territory_info()
-                    print(packed_territory_info)
-                    self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info}))
-                    self.switch_player()
-                    self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "initial_territory_selection"})
+                    if self.check_selected_initial_territory(selected_initial_territory):
+                        packed_territory_info = self.pack_territory_info()
+                        print(packed_territory_info)
+                        self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info}))
+                        self.switch_player()
+                        self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "initial_territory_selection"})
 
 
 
@@ -157,10 +157,13 @@ class RiskServer:
             self.current_player.territories.append(territory)
             territory.soldierNumber += 1
             self.current_player.soldiers_in_hand -= 1
+            return True
         elif territory.owner == self.current_player:
             self.send_to_client(self.current_player.connection, {"type": "reselect_territory", "message": f"{self.current_player.name}, you already own {territory.name}. Please select a new territory"})
+            return False
         else:
             self.send_to_client(self.current_player.connection, {"type": "reselect_territory", "message": f"{territory.name} has already been chosen by {territory.owner.name}. Please select a new territory"})
+            return False
 
 
 if __name__ == "__main__":
