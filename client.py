@@ -210,7 +210,8 @@ class RiskClient:
                         if event.key == K_RETURN:
                             # Send the entered name to the server
                             self.player_name = text
-                            self.client_socket.sendall(self.player_name.encode())
+                            message = {"type": "name_selection", "name": self.player_name}
+                            self.client_socket.sendall(pickle.dumps(message))
                             return
                         elif event.key == K_BACKSPACE:
                             text = text[:-1]
