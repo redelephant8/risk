@@ -88,7 +88,7 @@ class RiskClient:
                     self.prev_game_state = self.game_state
 
                 if self.game_state == "print_board":
-                    self.edit_screen(screen)
+                    self.edit_screen(screen, f"It's {self.current_player}'s turn")
                     self.prev_game_state = self.game_state
             pygame.display.flip()  # Update the display
 
@@ -141,6 +141,9 @@ class RiskClient:
                     self.territory_information = message.get("territory_info")
                     self.update_local_board()
                     self.game_state = "print_board"
+
+                if message_type == "current_player":
+                    self.current_player = message.get("current_player")
 
                 if message_type == "turn_message":
                     print("It is my turn")
