@@ -22,6 +22,7 @@ class RiskClient:
         self.game_state = "lobby"
         self.player_list = []
         self.prev_player_list = []
+        self.prev_game_state = "None"
         self.is_host = False  # Variable to track whether the player is the host
         self.board = Board()
         self.territory_information = {}
@@ -62,22 +63,31 @@ class RiskClient:
                 self.host_wait_screen(screen)
                 self.prev_player_list = self.player_list
 
-            if self.game_state == "initial_territories":
-                self.edit_screen(screen)
+            if self.prev_game_state != self.game_state:
+                if self.game_state == "initial_territories":
+                    self.edit_screen(screen)
+                    self.prev_game_state = self.game_state
 
-            # if self.my_turn and self.game_state == "initial_territories":
-            #     self.edit_screen(screen, f"{self.player_name}, please select a territory")
-            #     selected_territory = self.select_territory()
-            #     print(selected_territory)
-            #     message = {"type": "selected_initial_territory", "territory": selected_territory.lower_name}
-            #     self.client_socket.sendall(pickle.dumps(message))
+                # if self.my_turn and self.game_state == "initial_territories":
+                #     self.edit_screen(screen, f"{self.player_name}, please select a territory")
+                #     selected_territory = self.select_territory()
+                #     print(selected_territory)
+                #     message = {"type": "selected_initial_territory", "territory": selected_territory.lower_name}
+                #     self.client_socket.sendall(pickle.dumps(message))
 
-            if self.my_turn and self.game_state == "select_territory":
-                self.edit_screen(screen, self.player_message)
-                selected_territory = self.select_territory()
-                print(selected_territory)
-                message = {"type": "selected_territory", "territory": selected_territory.lower_name}
-                self.client_socket.sendall(pickle.dumps(message))
+                if self.my_turn and self.game_state == "select_territory":
+                    self.edit_screen(screen, self.player_message)
+                    selected_territory = self.select_territory()
+                    print(selected_territory)
+
+                    # Remember THIS NAME CHANGE!!!
+                    message = {"type": "selected_initial_territory", "territory": selected_territory.lower_name}
+                    self.client_socket.sendall(pickle.dumps(message))
+                    self.prev_game_state = self.game_state
+
+                if self.game_state == "print_board":
+                    self.edit_screen(screen)
+                    self.prev_game_state = self.game_state
             pygame.display.flip()  # Update the display
 
             clock.tick(30)  # Limit frame rate to 30 FPS
@@ -105,9 +115,12 @@ class RiskClient:
                 if message_type == "player_names":
                     print("hihihihih")
                     self.player_list = message.get("message")
-                    self.player_color = message.get("color")
+                    # self.player_color = message.get("color")
                     print(message)
                     print(self.player_list)
+
+                if message_type == "player_color":
+                    self.player_color = message.get("color")
 
                 if message_type == "start_game":
                     print("We have officially began the risk game.")
@@ -121,6 +134,11 @@ class RiskClient:
                     print("I need to reselect my territory")
                     self.game_state = "select_territory"
                     self.player_message = message.get("message")
+
+                if message_type == "edit_board":
+                    self.territory_information = message.get("territory_info")
+                    self.update_local_board()
+                    self.game_state = "print_board"
 
                 if message_type == "turn_message":
                     print("It is my turn")
@@ -241,8 +259,10 @@ class RiskClient:
     def update_local_board(self):
         # for territory_name, territory in self.board.territories.items
         for territory_name, territory_info in self.territory_information.items():
-            self.board.territories[territory_name].soldierNumber = territory_info[1]
-            self.board.territories[territory_name].name = territory_info[0]
+            self.board.territories[territory_name].soldierNumber = territory_info[0]
+
+            #THIS ALSO NEEDS TO BE FIXED
+            self.board.territories[territory_name].owner = territory_name
 
     def edit_screen(self, screen, message=None):
         # Clear the screen
@@ -250,7 +270,7 @@ class RiskClient:
 
         # Draw the territories
         for territory_name, territory in self.board.territories.items():
-            territory.draw(screen, self.player_color)
+            territory.draw(screen, (self.territory_information[territory_name])[1])
             territory.draw_lines_to_neighbors(screen)
 
         # game.board.territories["qatar"].draw(screen)
