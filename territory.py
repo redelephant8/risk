@@ -4,8 +4,9 @@ pygame.font.init()
 
 
 class Territory:
-    def __init__(self, name, x, y, image_location):
+    def __init__(self, name, lower_name, x, y, image_location):
         self.name = name
+        self.lower_name = lower_name
         self.soldierNumber = 0
         self.owner = None
         self.neighbors = []
@@ -17,9 +18,9 @@ class Territory:
     def click(self, mouse_pos):
         return self.rect.collidepoint(mouse_pos)
 
-    def draw(self, screen):
+    def draw(self, screen, color=(255, 0, 0)):
         screen.blit(self.image, self.rect)
-        pygame.draw.rect(screen, (255, 0, 0) if self.owner is None else self.owner.color,
+        pygame.draw.rect(screen, color,
                          (self.coordinates[0], self.coordinates[1], 50, 50))
         font = pygame.font.Font(None, 36)
         text = font.render(str(self.soldierNumber), True, (0, 0, 0))
