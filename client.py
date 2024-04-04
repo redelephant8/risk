@@ -20,6 +20,7 @@ class RiskClient:
         self.player_color = None
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.game_state = "lobby"
+        self.game_stage = "start"
         self.player_list = []
         self.prev_player_list = []
         self.prev_game_state = "None"
@@ -64,9 +65,9 @@ class RiskClient:
                 self.prev_player_list = self.player_list
 
             if self.prev_game_state != self.game_state:
-                if self.game_state == "initial_territories":
-                    self.edit_screen(screen)
-                    self.prev_game_state = self.game_state
+                # if self.game_state == "initial_territories":
+                #     self.edit_screen(screen)
+                #     self.prev_game_state = self.game_state
 
                 # if self.my_turn and self.game_state == "initial_territories":
                 #     self.edit_screen(screen, f"{self.player_name}, please select a territory")
@@ -81,8 +82,9 @@ class RiskClient:
                     print(selected_territory)
 
                     # Remember THIS NAME CHANGE!!!
-                    message = {"type": "selected_initial_territory", "territory": selected_territory.lower_name}
-                    self.client_socket.sendall(pickle.dumps(message))
+                    if self.game_stage == "initial_territories":
+                        message = {"type": "selected_initial_territory", "territory": selected_territory.lower_name}
+                        self.client_socket.sendall(pickle.dumps(message))
                     self.prev_game_state = self.game_state
 
                 if self.game_state == "print_board":
@@ -106,8 +108,7 @@ class RiskClient:
                 message_type = message.get("type")
                 print(f"Message type: {message_type}")
 
-                if message_type == "message":
-                    print(message["message"])  # Print host message
+                if message_type == "join_message":
                     if message.get("message") == "You are the host.":
                         self.is_host = True  # Set the player as the host
                         print("IJIOJDSOIFJSD, it worked")
@@ -127,8 +128,8 @@ class RiskClient:
                     self.territory_information = message.get("territory_info")
                     print(message.get("territory_info"))
                     self.update_local_board()
-                    self.game_state = "select_territory"
-                    self.player_message = f"{self.player_name}, please select a territory"
+                    self.game_state = "print_board"
+
 
                 if message_type == "reselect_territory":
                     print("I need to reselect my territory")
@@ -142,6 +143,10 @@ class RiskClient:
 
                 if message_type == "turn_message":
                     print("It is my turn")
+                    if message.get("turn_type") == "initial_territory_selection":
+                        self.player_message = f"{self.player_name}, please select a territory"
+                        self.game_state = "select_territory"
+                        self.game_stage = "initial_territories"
                     self.my_turn = True
         except Exception as e:
             print(f"Error in client: {e}")
