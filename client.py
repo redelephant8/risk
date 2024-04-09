@@ -67,17 +67,6 @@ class RiskClient:
                 self.prev_player_list = self.player_list
 
             if self.prev_game_state != self.game_state:
-                # if self.game_state == "initial_territories":
-                #     self.edit_screen(screen)
-                #     self.prev_game_state = self.game_state
-
-                # if self.my_turn and self.game_state == "initial_territories":
-                #     self.edit_screen(screen, f"{self.player_name}, please select a territory")
-                #     selected_territory = self.select_territory()
-                #     print(selected_territory)
-                #     message = {"type": "selected_initial_territory", "territory": selected_territory.lower_name}
-                #     self.client_socket.sendall(pickle.dumps(message))
-
                 if self.my_turn and self.game_state == "select_territory":
                     self.edit_screen(screen, self.player_message)
                     selected_territory = self.select_territory()
@@ -89,6 +78,10 @@ class RiskClient:
                         self.client_socket.sendall(pickle.dumps(message))
                     elif self.game_stage == "initial_soldiers":
                         message = {"type": "selected_initial_soldier_territory", "territory": selected_territory.lower_name}
+                        self.client_socket.sendall(pickle.dumps(message))
+                    elif self.game_stage == "receiving_reinforcements":
+                        message = {"type": "selected_reinforcement_territory",
+                                   "territory": selected_territory.lower_name}
                         self.client_socket.sendall(pickle.dumps(message))
                     self.prev_game_state = self.game_state
 
@@ -173,6 +166,12 @@ class RiskClient:
                         self.player_message = f"{self.player_name}, please select a territory that you own to add a soldier to:"
                         self.game_state = "select_territory"
                         self.game_stage = "initial_soldiers"
+                    elif message.get("turn_type") == "receiving_reinforcements":
+                        if message.get("first") is True:
+                            self.player_message = f"{self.player_name}, you have been awarded {message.get("number")} soldiers to place.\n please select one of your territories to add a reinforcement to: "
+                        self.player_message = f"{self.player_name}, you have {message.get("number")} soldiers remaining. Please select another territory to place a soldier in."
+                        self.game_state = "select_territory"
+                        self.game_stage = "receiving_reinforcements"
         except Exception as e:
             print(f"Error in client: {e}")
 
