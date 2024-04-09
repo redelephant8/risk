@@ -167,9 +167,9 @@ class RiskClient:
                         self.game_state = "select_territory"
                         self.game_stage = "initial_soldiers"
                     elif message.get("turn_type") == "receiving_reinforcements":
-                        if message.get("first") is True:
-                            self.player_message = f"{self.player_name}, you have been awarded {message.get("number")} soldiers to place.\n please select one of your territories to add a reinforcement to: "
                         self.player_message = f"{self.player_name}, you have {message.get("number")} soldiers remaining. Please select another territory to place a soldier in."
+                        if message.get("first_time") == "True":
+                            self.player_message = f"{self.player_name}, you have been awarded {message.get("number")} soldiers to place.\n please select one of your territories to add a reinforcement to: "
                         self.game_state = "select_territory"
                         self.game_stage = "receiving_reinforcements"
         except Exception as e:
