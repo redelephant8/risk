@@ -32,7 +32,7 @@ class RiskClient:
         self.my_turn = False
         self.territory_selected = False
         self.player_message = None
-        self.update_num = 0
+        self.edited = False
 
     def start(self):
         width, height = 800, 600
@@ -66,8 +66,9 @@ class RiskClient:
                 self.host_wait_screen(screen)
                 self.prev_player_list = self.player_list
 
-            if self.prev_game_state != self.game_state:
-                if self.my_turn and self.game_state == "select_territory":
+            if self.edited is False:
+                self.edited = True
+                if self.game_state == "select_territory":
                     self.edit_screen(screen, self.player_message)
                     selected_territory = self.select_territory()
                     print(selected_territory)
@@ -89,9 +90,9 @@ class RiskClient:
                     self.edit_screen(screen, f"It's {self.current_player}'s turn")
                     self.prev_game_state = self.game_state
 
-            if self.prev_player != self.current_player and self.game_state == "print_board":
-                self.edit_screen(screen, f"It's {self.current_player}'s turn")
-                self.prev_player = self.current_player
+            # if self.prev_player != self.current_player and self.game_state == "print_board":
+            #     self.edit_screen(screen, f"It's {self.current_player}'s turn")
+            #     self.prev_player = self.current_player
 
             pygame.display.flip()  # Update the display
 
@@ -107,6 +108,7 @@ class RiskClient:
                     break
 
                 # Process received message
+                self.edited = False
                 message = pickle.loads(data)
                 message_type = message.get("type")
                 print(f"Message type: {message_type}")
@@ -137,7 +139,6 @@ class RiskClient:
 
                 if message_type == "reselect_territory":
                     print("I need to reselect my territory")
-                    self.my_turn = True
                     self.prev_game_state = "None"
                     self.game_state = "select_territory"
                     self.player_message = message.get("message")
@@ -156,7 +157,6 @@ class RiskClient:
                 #         self.game_state = "print_board"
 
                 if message_type == "turn_message":
-                    self.my_turn = True
                     print("It is my turn")
                     if message.get("turn_type") == "initial_territory_selection":
                         self.player_message = f"{self.player_name}, please select a territory"
