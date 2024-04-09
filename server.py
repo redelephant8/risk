@@ -101,12 +101,18 @@ class RiskServer:
                         packed_territory_info = self.pack_territory_info()
                         print(packed_territory_info)
                         self.switch_player()
-                        self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info, "current_player": self.current_player.name}))
+                        self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info,
+                                             "current_player": self.current_player.name}))
+                        time.sleep(0.1)
                         if self.territories_remaining > 0:
                             self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "initial_territory_selection"})
                         else:
+                            self.current_player = self.player_list[0]
                             self.players_remaining = self.player_number
+                            self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info,
+                                             "current_player": self.current_player.name}))
                             self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "initial_soldier_addition"})
+
 
                 if message_type == "selected_initial_soldier_territory":
                     time.sleep(0.1)
@@ -122,7 +128,21 @@ class RiskServer:
                         if self.players_remaining > 0:
                             self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "initial_soldier_addition"})
                         else:
+                            self.current_player = self.player_list[0]
+                            self.current_player.soldiers_in_hand = self.current_player.reinforcement_calculator
+                            self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "receiving_reinforcements", "number": self.current_player.soldiers_in_hand, "first_time": True})
+
+                if message_type == "receiving_reinforcements":
+                    time.sleep(0.1)
+                    selected_territory = self.board.territories[message.get("territory")]
+                    if self.check_reinforcement_territory(selected_territory):
+                        packed_territory_info = self.pack_territory_info()
+                        self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info, "current_player": self.current_player.name}))
+                        if self.current_player.soldiers_in_hand > 0:
+                            self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "receiving_reinforcements", "number": self.current_player.soldiers_in_hand, "first_time": False})
+                        else:
                             self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "combat_phase"})
+
 
 
 
@@ -202,6 +222,15 @@ class RiskServer:
             return True
         else:
             self.send_to_client(self.current_player.connection, {"type": "reselect_territory", "message": f"{territory.name} is owned by {territory.owner.name}. You can not add soldiers to a territory you don't own"})
+            return False
+
+    def check_reinforcement_territory(self, territory):
+        if territory.owner is self.current_player:
+            territory.soldierNumber += 1
+            self.current_player.soldiers_in_hand -= 1
+            return True
+        else:
+            self.send_to_client(self.current_player.connection, {"type": "reselect_territory", "message": f"{territory.name} is owned by {territory.owner.name}. You cannot add soldiers to a territory you don't own"})
             return False
 
 if __name__ == "__main__":
