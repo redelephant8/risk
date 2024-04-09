@@ -88,13 +88,11 @@ class RiskServer:
                     packed_territory_info = self.pack_territory_info()
                     self.player_number = len(self.player_list)
                     self.switch_player()
-                    self.broadcast(({"type": "start_game", "territory_info": packed_territory_info}))
+                    self.broadcast(({"type": "start_game", "territory_info": packed_territory_info, "current_player": self.current_player.name}))
                     time.sleep(0.1)
                     # current_player_index = self.player_list.index(self.current_player)
                     # current_player_connection = self.connections[current_player_index]
-
-                    current_player_connection = self.current_player.connection
-                    self.send_to_client(current_player_connection, {"type": "turn_message", "turn_type": "initial_territory_selection"})
+                    self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "initial_territory_selection"})
 
                 if message_type == "selected_initial_territory":
                     time.sleep(0.1)
@@ -102,9 +100,8 @@ class RiskServer:
                     if self.check_selected_initial_territory(selected_initial_territory):
                         packed_territory_info = self.pack_territory_info()
                         print(packed_territory_info)
-                        self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info}))
-                        time.sleep(0.1)
                         self.switch_player()
+                        self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info, "current_player": self.current_player.name}))
                         if self.territories_remaining > 0:
                             self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "initial_territory_selection"})
                         else:
@@ -117,10 +114,15 @@ class RiskServer:
                     if self.check_selected_initial_soldier_territory(selected_initial_soldier_territory):
                         packed_territory_info = self.pack_territory_info()
                         print(packed_territory_info)
-                        self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info}))
                         self.switch_player()
+                        if self.players_remaining > 0 and self.current_player.isOut is True:
+                            while self.current_player.isOut is False:
+                                self.switch_player()
+                        self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info, "current_player": self.current_player.name}))
                         if self.players_remaining > 0:
                             self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "initial_soldier_addition"})
+                        else:
+                            self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "combat_phase"})
 
 
 
@@ -142,8 +144,10 @@ class RiskServer:
                 color = territory.owner.color
             packed_territory_info[territory_name] = [territory.soldierNumber, color]
         return packed_territory_info
-    def broadcast(self, data):
+    def broadcast(self, data, exception=None):
         for connection in self.connections:
+            if connection == exception:
+                continue
             try:
                 connection.sendall(pickle.dumps(data))
                 print(f"sent to client {connection.getpeername}")
@@ -170,7 +174,8 @@ class RiskServer:
                     self.current_player = self.player_list[0]
                 else:
                     self.current_player = self.player_list[current_idx + 1]
-            self.broadcast({"type": "current_player", "current_player": self.current_player.name})
+            # self.broadcast({"type": "current_player", "current_player_name": self.current_player.name}, self.current_player.connection)
+            # time.sleep(0.1)
 
     def check_selected_initial_territory(self, territory):
         if territory.owner is None:
@@ -200,7 +205,7 @@ class RiskServer:
             return False
 
 if __name__ == "__main__":
-    HOST = "10.116.3.115"  # Change this to your server's IP address
+    HOST = "192.168.86.148"  # Change this to your server's IP address
     PORT = 8080  # Choose a suitable port
     server = RiskServer(HOST, PORT)
     server.start()
