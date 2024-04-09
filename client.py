@@ -28,9 +28,11 @@ class RiskClient:
         self.board = Board()
         self.territory_information = {}
         self.current_player = None
+        self.prev_player = None
         self.my_turn = False
         self.territory_selected = False
         self.player_message = None
+        self.update_num = 0
 
     def start(self):
         width, height = 800, 600
@@ -90,10 +92,14 @@ class RiskClient:
                         self.client_socket.sendall(pickle.dumps(message))
                     self.prev_game_state = self.game_state
 
-
                 if self.game_state == "print_board":
                     self.edit_screen(screen, f"It's {self.current_player}'s turn")
                     self.prev_game_state = self.game_state
+
+            if self.prev_player != self.current_player and self.game_state == "print_board":
+                self.edit_screen(screen, f"It's {self.current_player}'s turn")
+                self.prev_player = self.current_player
+
             pygame.display.flip()  # Update the display
 
             clock.tick(30)  # Limit frame rate to 30 FPS
@@ -130,6 +136,7 @@ class RiskClient:
                 if message_type == "start_game":
                     print("We have officially began the risk game.")
                     self.territory_information = message.get("territory_info")
+                    self.current_player = message.get("current_player")
                     print(message.get("territory_info"))
                     self.update_local_board()
                     self.game_state = "print_board"
@@ -137,19 +144,26 @@ class RiskClient:
 
                 if message_type == "reselect_territory":
                     print("I need to reselect my territory")
+                    self.my_turn = True
                     self.prev_game_state = "None"
                     self.game_state = "select_territory"
                     self.player_message = message.get("message")
 
                 if message_type == "edit_board":
                     self.territory_information = message.get("territory_info")
+                    self.prev_player = self.current_player
+                    self.current_player = message.get("current_player")
                     self.update_local_board()
                     self.game_state = "print_board"
 
-                if message_type == "current_player":
-                    self.current_player = message.get("current_player")
+                # if message_type == "current_player":
+                #     self.my_turn = False
+                #     self.current_player = message.get("current_player_name")
+                #     if self.territory_information != {}:
+                #         self.game_state = "print_board"
 
                 if message_type == "turn_message":
+                    self.my_turn = True
                     print("It is my turn")
                     if message.get("turn_type") == "initial_territory_selection":
                         self.player_message = f"{self.player_name}, please select a territory"
@@ -159,7 +173,6 @@ class RiskClient:
                         self.player_message = f"{self.player_name}, please select a territory that you own to add a soldier to:"
                         self.game_state = "select_territory"
                         self.game_stage = "initial_soldiers"
-                    self.my_turn = True
         except Exception as e:
             print(f"Error in client: {e}")
 
@@ -291,21 +304,6 @@ class RiskClient:
             territory.draw(screen, (self.territory_information[territory_name])[1])
             territory.draw_lines_to_neighbors(screen)
 
-        # game.board.territories["qatar"].draw(screen)
-        # game.board.territories["qatar"].draw_lines_to_neighbors(screen)
-        #
-        # game.board.territories["afghanistan"].draw(screen)
-        # game.board.territories["afghanistan"].draw_lines_to_neighbors(screen)
-        #
-        # game.board.territories["saudi_arabia"].draw(screen)
-        # game.board.territories["saudi_arabia"].draw_lines_to_neighbors(screen)
-        #
-        # game.board.territories["iran"].draw(screen)
-        # game.board.territories["iran"].draw_lines_to_neighbors(screen)
-        #
-        # game.board.territories["egypt"].draw(screen)
-        # game.board.territories["egypt"].draw_lines_to_neighbors(screen)
-
         # Draw the button
         button_rect = pygame.Rect(600, 500, 150, 50)  # Button position and size
         pygame.draw.rect(screen, (0, 0, 255), button_rect)  # Draw the button
@@ -328,7 +326,7 @@ class RiskClient:
 
 
 if __name__ == "__main__":
-    HOST = "10.116.3.115"  # Change this to your server's IP address
+    HOST = "192.168.86.148"  # Change this to your server's IP address
     PORT = 8080  # Choose the same port as the server
     # player_name = input("Enter your player name: ")
     client = RiskClient(HOST, PORT)
