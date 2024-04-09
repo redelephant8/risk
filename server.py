@@ -126,19 +126,19 @@ class RiskServer:
                             self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "initial_soldier_addition"})
                         else:
                             self.current_player = self.player_list[0]
-                            self.current_player.soldiers_in_hand = self.current_player.reinforcement_calculator
+                            self.current_player.soldiers_in_hand = self.current_player.reinforcement_calculator()
                             self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info,
                                              "current_player": self.current_player.name}))
-                            self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "receiving_reinforcements", "number": self.current_player.soldiers_in_hand, "first_time": True})
+                            self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "receiving_reinforcements", "number": self.current_player.soldiers_in_hand, "first_time": "True"})
 
-                if message_type == "receiving_reinforcements":
+                if message_type == "selected_reinforcement_territory":
                     time.sleep(0.1)
                     selected_territory = self.board.territories[message.get("territory")]
                     if self.check_reinforcement_territory(selected_territory):
                         packed_territory_info = self.pack_territory_info()
                         self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info, "current_player": self.current_player.name}))
                         if self.current_player.soldiers_in_hand > 0:
-                            self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "receiving_reinforcements", "number": self.current_player.soldiers_in_hand, "first_time": False})
+                            self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "receiving_reinforcements", "number": self.current_player.soldiers_in_hand, "first_time": "False"})
                         else:
                             self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "combat_phase"})
             except Exception as e:
