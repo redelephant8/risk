@@ -80,7 +80,6 @@ class RiskServer:
                     self.broadcast({"type": "player_names", "message": self.player_names})
                     self.send_to_client(client_socket, {"type": "player_color", "color": player_color})
 
-
                 if message_type == "start_game":
                     print("Host started game")
                     time.sleep(0.1)
@@ -103,7 +102,6 @@ class RiskServer:
                         self.switch_player()
                         self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info,
                                              "current_player": self.current_player.name}))
-                        time.sleep(0.1)
                         if self.territories_remaining > 0:
                             self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "initial_territory_selection"})
                         else:
@@ -115,14 +113,13 @@ class RiskServer:
 
 
                 if message_type == "selected_initial_soldier_territory":
-                    time.sleep(0.1)
                     selected_initial_soldier_territory = self.board.territories[message.get("territory")]
                     if self.check_selected_initial_soldier_territory(selected_initial_soldier_territory):
                         packed_territory_info = self.pack_territory_info()
                         print(packed_territory_info)
                         self.switch_player()
                         if self.players_remaining > 0 and self.current_player.isOut is True:
-                            while self.current_player.isOut is False:
+                            while self.current_player.isOut is True:
                                 self.switch_player()
                         self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info, "current_player": self.current_player.name}))
                         if self.players_remaining > 0:
@@ -130,6 +127,8 @@ class RiskServer:
                         else:
                             self.current_player = self.player_list[0]
                             self.current_player.soldiers_in_hand = self.current_player.reinforcement_calculator
+                            self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info,
+                                             "current_player": self.current_player.name}))
                             self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "receiving_reinforcements", "number": self.current_player.soldiers_in_hand, "first_time": True})
 
                 if message_type == "receiving_reinforcements":
@@ -142,11 +141,6 @@ class RiskServer:
                             self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "receiving_reinforcements", "number": self.current_player.soldiers_in_hand, "first_time": False})
                         else:
                             self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "combat_phase"})
-
-
-
-
-
             except Exception as e:
                 print(f"Error handling client: {e}")
                 break
