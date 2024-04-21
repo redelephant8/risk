@@ -6,6 +6,17 @@ import threading
 from board import Board
 
 width, height = 800, 600
+DICE_SIZE = 10
+DICE_OFFSET_X = 50
+DICE_OFFSET_Y = 50
+DICE_IMAGES = {
+    1: pygame.image.load("dice_white_1.png"),
+    2: pygame.image.load("dice_white_2.png"),
+    3: pygame.image.load("dice_white_3.png"),
+    4: pygame.image.load("dice_white_4.png"),
+    5: pygame.image.load("dice_white_5.png"),
+    6: pygame.image.load("dice_white_6.png"),
+}
 def draw_text(text, font, color, surface, x, y):
     text_obj = font.render(text, True, color)
     text_rect = text_obj.get_rect()
@@ -33,6 +44,9 @@ class RiskClient:
         self.territory_selected = False
         self.player_message = None
         self.edited = False
+        self.number = []
+        self.attacker_dice = None
+        self.defender_dice = None
 
     def start(self):
         width, height = 800, 600
@@ -84,7 +98,31 @@ class RiskClient:
                         message = {"type": "selected_reinforcement_territory",
                                    "territory": selected_territory.lower_name}
                         self.client_socket.sendall(pickle.dumps(message))
+                    elif self.game_stage == "attacking_territory":
+                        message = {"type": "selected_attacking_territory", "territory": selected_territory.lower_name}
+                        self.client_socket.sendall(pickle.dumps(message))
+                    elif self.game_stage == "defending_territory":
+                        message = {"type": "selected_defending_territory", "territory": selected_territory.lower_name}
+                        self.client_socket.sendall(pickle.dumps(message))
                     self.prev_game_state = self.game_state
+
+                if self.game_state == "select_soldiers":
+                    if self.game_stage == "attacking_territory_soldiers":
+                        number = self.create_popup(screen, self.player_message, self.number) + 1
+                        message = {"type": "selected_attacking_soldiers", "number": number}
+                        self.client_socket.sendall(pickle.dumps(message))
+                    elif self.game_stage == "transferring_territory_soldiers":
+                        number = self.create_popup(screen, self.player_message, self.number) + 1
+                        message = {"type": "selected_transferring_soldiers", "number": number}
+                        self.client_socket.sendall(pickle.dumps(message))
+                    elif self.game_stage == "attack_summary":
+                        result_options = ["Continue Fighting", "End Combat"]
+                        result_index = self.create_popup(screen, self.player_message, result_options,
+                                                         dice_results=self.attacker_dice + self.defender_dice)
+                        message = {"type": "selected_attack_option", "number": result_index}
+                        self.client_socket.sendall(pickle.dumps(message))
+                    self.prev_game_state = self.game_state
+
 
                 if self.game_state == "print_board":
                     self.edit_screen(screen, f"It's {self.current_player}'s turn")
@@ -172,6 +210,34 @@ class RiskClient:
                             self.player_message = f"{self.player_name}, you have been awarded {message.get("number")} soldiers to place.\n please select one of your territories to add a reinforcement to: "
                         self.game_state = "select_territory"
                         self.game_stage = "receiving_reinforcements"
+                    elif message.get("turn_type") == "select_attacking_territory":
+                        self.player_message = f"{self.player_name}, please select a territory you would like to attack with"
+                        self.game_state = "select_territory"
+                        self.game_stage = "attacking_territory"
+                    elif message.get("turn_type") == "select_attacking_soldiers":
+                        self.player_message = "Select number of soldiers to send:"
+                        self.number = message.get("number")
+                        self.game_state = "select_soldiers"
+                        self.game_stage = "attacking_territory_soldiers"
+                    elif message.get("turn_type") == "select_defending_territory":
+                        self.player_message = "Please select an enemy territory you would like to attack"
+                        self.game_state = "select_territory"
+                        self.game_stage = "defending_territory"
+                    elif message.get("turn_type") == "select_transfer_soldiers":
+                        print("WEWEWERWERWERWERWEr")
+                        self.attacker_dice = message.get("attacker_dice")
+                        self.defender_dice = message.get("defender_dice")
+                        self.player_message = "Please select how many soldiers you will move over"
+                        self.number = message.get("transfer_options")
+                        self.game_state = "select_soldiers"
+                        self.game_stage = "transferring_territory_soldiers"
+                    elif message.get("turn_type") == "attack_results":
+                        self.attacker_dice = message.get("attacker_dice")
+                        self.defender_dice = message.get("defender_dice")
+                        self.player_message =f"You rolled: {self.attacker_dice}\n{message.get("defender")} rolled: {self.defender_dice}"
+                        self.game_state = "select_soldiers"
+                        self.game_stage = "attack_summary"
+
         except Exception as e:
             print(f"Error in client: {e}")
 
@@ -322,6 +388,71 @@ class RiskClient:
 
         # Control the frame rate
         pygame.time.Clock().tick(30)
+
+    def create_popup(self, screen, text, options, dice_results=None):
+        # Determine popup size based on content
+        popup_width = 400
+        option_height = 40
+        popup_height = 200 + len(options) * option_height  # Adjusted spacing
+        if dice_results:
+            popup_height += 150  # Additional height for dice results
+        popup_x = (width - popup_width) // 2
+        popup_y = (height - popup_height) // 2
+        popup_rect = pygame.Rect(popup_x, popup_y, popup_width, popup_height)
+
+        # Draw the popup window
+        pygame.draw.rect(screen, (200, 200, 200), popup_rect)
+        pygame.draw.rect(screen, (0, 0, 0), popup_rect, 2)
+
+        # Add text to the popup
+        font = pygame.font.SysFont(None, 30)
+        text_surface = font.render(text, True, (0, 0, 0))
+        text_rect = text_surface.get_rect(
+            center=(popup_x + popup_width // 2, popup_y + 40))  # Adjusted vertical position
+        screen.blit(text_surface, text_rect)
+
+        # Calculate vertical spacing for options
+        total_option_height = len(options) * option_height
+        start_y = popup_y + 100 + (popup_height - 100 - total_option_height) // 2
+
+        # Add buttons for each option
+        button_width = 120
+        for i, option in enumerate(options):
+            button_x = popup_x + (popup_width - button_width) // 2
+            button_y = start_y + i * option_height
+            button_rect = pygame.Rect(button_x, button_y, button_width, option_height)
+            pygame.draw.rect(screen, (100, 100, 255), button_rect)
+            text_surface = font.render(option, True, (255, 255, 255))
+            text_rect = text_surface.get_rect(center=button_rect.center)
+            screen.blit(text_surface, text_rect)
+
+        # Draw dice results
+        if dice_results:
+            dice_text = "Dice Results:"
+            dice_text_surface = font.render(dice_text, True, (0, 0, 0))
+            dice_text_rect = dice_text_surface.get_rect(center=(popup_x + popup_width // 2, popup_y + 150))
+            screen.blit(dice_text_surface, dice_text_rect)
+
+            dice_x = popup_x + (popup_width - DICE_SIZE * len(dice_results)) // 2
+            dice_y = popup_y + popup_height - 120
+            for i, result in enumerate(dice_results):
+                self.draw_dice(screen, result, dice_x + i * (DICE_SIZE + 10), dice_y)
+
+        pygame.display.flip()
+
+        # Return the index of the selected option
+        while True:
+            for event in pygame.event.get():
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    mouse_pos = pygame.mouse.get_pos()
+                    for i, option in enumerate(options):
+                        button_rect = pygame.Rect(button_x, start_y + i * option_height, button_width, option_height)
+                        if button_rect.collidepoint(mouse_pos):
+                            return i
+
+    def draw_dice(self, screen, value, x, y):
+        screen.blit(DICE_IMAGES[value], (x, y))
+        pygame.display.flip()
 
 
 if __name__ == "__main__":
