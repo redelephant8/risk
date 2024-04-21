@@ -33,10 +33,12 @@ class RiskServer:
         self.current_attack_number = 0
         self.current_defending_territory = None
         self.dice = []
+        self.cards = ["infantry"]*14 + ["cavalry"]*14 + ["artillery"]*14
 
     def start(self):
         self.server_socket.bind((self.host, self.port))
         self.server_socket.listen()
+        random.shuffle(self.cards)
 
         print(f"Server is listening on {self.host}:{self.port}")
 
@@ -122,11 +124,13 @@ class RiskServer:
                     if self.check_selected_initial_soldier_territory(selected_initial_soldier_territory):
                         packed_territory_info = self.pack_territory_info()
                         print(packed_territory_info)
+                        print(self.players_remaining)
                         self.switch_player()
                         if self.players_remaining > 0 and self.current_player.isOut is True:
                             while self.current_player.isOut is True:
                                 self.switch_player()
                         self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info, "current_player": self.current_player.name}))
+                        time.sleep(0.1)
                         if self.players_remaining > 0:
                             self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "initial_soldier_addition"})
                         else:
@@ -134,6 +138,7 @@ class RiskServer:
                             self.current_player.soldiers_in_hand = self.current_player.reinforcement_calculator()
                             self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info,
                                              "current_player": self.current_player.name}))
+                            time.sleep(0.1)
                             self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "receiving_reinforcements", "number": self.current_player.soldiers_in_hand, "first_time": "True"})
 
                 if message_type == "selected_reinforcement_territory":
@@ -178,18 +183,28 @@ class RiskServer:
                     time.sleep(0.1)
                     result_index = message.get("number")
                     if result_index == 1:
+                        if self.current_player.has_conquered:
+                            card = self.cards.pop(0)
+                            self.current_player.cards[card] = self.current_player.cards[card] + 1
+                            print(card)
                         self.switch_player()
                     packed_territory_info = self.pack_territory_info()
                     print(packed_territory_info)
                     self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info,
                                      "current_player": self.current_player.name}))
                     time.sleep(0.1)
-                    self.send_to_client(self.current_player.connection,
-                                        {"type": "turn_message", "turn_type": "select_attacking_territory"})
-
+                    self.current_player.has_conquered = False
+                    self.current_player.soldiers_in_hand = self.current_player.reinforcement_calculator()
+                    if result_index == 1:
+                        self.send_to_client(self.current_player.connection,
+                                            {"type": "turn_message", "turn_type": "receiving_reinforcements", "number": self.current_player.soldiers_in_hand, "first_time": "True"})
+                    else:
+                        self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "select_attacking_territory"})
 
 
             except Exception as e:
+                import traceback
+                traceback.print_exc()
                 print(f"Error handling client: {e}")
                 break
 
@@ -332,6 +347,7 @@ class RiskServer:
             defending_territory.owner = attacking_territory.owner
             transfer_options = [str(i) for i in range(1, attacking_territory.soldierNumber)]
             self.dice = [attacker_dice, defender_dice, defending_territory.owner.name]
+            self.current_player.has_conquered = True
             self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "select_transfer_soldiers", "transfer_options": transfer_options})
         else:
             self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "attack_results", "attacker_dice": attacker_dice, "defender_dice": defender_dice, "attacker": attacking_territory.owner.name, "defender": defending_territory.owner.name})
