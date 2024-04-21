@@ -4,6 +4,7 @@ import pickle
 import time
 from board import Board
 from player import Player
+import random
 
 colors = ['red', 'blue', 'yellow', 'green', 'purple', 'pink']
 class RiskServer:
@@ -28,6 +29,10 @@ class RiskServer:
         self.player_number = 0
         self.players_remaining = 0
         self.territories_remaining = len(self.board.territories)
+        self.current_attacking_territory = None
+        self.current_attack_number = 0
+        self.current_defending_territory = None
+        self.dice = []
 
     def start(self):
         self.server_socket.bind((self.host, self.port))
@@ -140,7 +145,50 @@ class RiskServer:
                         if self.current_player.soldiers_in_hand > 0:
                             self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "receiving_reinforcements", "number": self.current_player.soldiers_in_hand, "first_time": "False"})
                         else:
-                            self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "combat_phase"})
+                            self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "select_attacking_territory"})
+
+                if message_type == "selected_attacking_territory":
+                    time.sleep(0.1)
+                    selected_territory = self.board.territories[message.get("territory")]
+                    check_selected, number = self.check_attacking_territory(selected_territory)
+                    if check_selected:
+                        self.current_attacking_territory = selected_territory
+                        self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "select_attacking_soldiers", "number": number})
+
+                if message_type == "selected_attacking_soldiers":
+                    time.sleep(0.1)
+                    self.current_attack_number = message.get("number")
+                    self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "select_defending_territory"})
+
+                if message_type == "selected_defending_territory":
+                    time.sleep(0.1)
+                    selected_territory = self.board.territories[message.get("territory")]
+                    if self.check_defending_territory(selected_territory):
+                        self.current_defending_territory = selected_territory
+                        self.attack(self.current_attacking_territory, selected_territory)
+
+                if message_type == "selected_transferring_soldiers":
+                    time.sleep(0.1)
+                    num_transferring_soldiers = message.get("number")
+                    self.current_defending_territory.soldierNumber = num_transferring_soldiers
+                    self.current_attacking_territory.soldierNumber -= num_transferring_soldiers
+                    self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "attack_results", "attacker_dice": self.dice[0], "defender_dice": self.dice[1], "defender": self.dice[2]})
+
+                if message_type == "selected_attack_option":
+                    time.sleep(0.1)
+                    result_index = message.get("number")
+                    if result_index == 1:
+                        self.switch_player()
+                    packed_territory_info = self.pack_territory_info()
+                    print(packed_territory_info)
+                    self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info,
+                                     "current_player": self.current_player.name}))
+                    time.sleep(0.1)
+                    self.send_to_client(self.current_player.connection,
+                                        {"type": "turn_message", "turn_type": "select_attacking_territory"})
+
+
+
             except Exception as e:
                 print(f"Error handling client: {e}")
                 break
@@ -226,6 +274,81 @@ class RiskServer:
         else:
             self.send_to_client(self.current_player.connection, {"type": "reselect_territory", "message": f"{territory.name} is owned by {territory.owner.name}. You cannot add soldiers to a territory you don't own"})
             return False
+
+    def check_attacking_territory(self, territory):
+        if territory.owner is self.current_player:
+            if territory.soldierNumber > 1:
+                if territory.check_neighbors(self.current_player):
+                    if territory.soldierNumber == 2:
+                        return True, ["1 Soldier"]
+                    elif territory.soldierNumber == 3:
+                        return True, ["1 Soldier", "2 Soldiers"]
+                    else:
+                        return True, ["1 Soldier", "2 Soldiers", "3 Soldiers"]
+                else:
+                    self.send_to_client(self.current_player.connection, {"type": "reselect_territory", "message": "There are no neighboring territories to attack"})
+                    return False, 0
+            else:
+                self.send_to_client(self.current_player.connection, {"type": "reselect_territory", "message": "You cannot attack with a territory that has less than 2 soldiers"})
+                return False, 0
+        else:
+            self.send_to_client(self.current_player.connection, {"type": "reselect_territory", "message": "You must select one of your own territories to attack with"})
+            return False, 0
+
+    def check_defending_territory(self, territory):
+        if territory in self.current_attacking_territory.neighbors:
+            if territory.owner is not self.current_player:
+                return True
+            else:
+                self.send_to_client(self.current_player.connection, {"type": "reselect_territory", "message": "You can't attack your own territory"})
+                return False
+        else:
+            self.send_to_client(self.current_player.connection,
+                                {"type": "reselect_territory", "message": "You must attack a neighboring territory"})
+            return False
+
+    def attack(self, attacking_territory, defending_territory):
+        print(f"New Battle: {self.current_player} is attacking {defending_territory.name} with {attacking_territory.name}")
+        attacker_dice = [random.randint(1, 6) for _ in
+                         range(min(attacking_territory.soldierNumber - 1, self.current_attack_number))]
+        defending_number = 2
+        if defending_territory.soldierNumber == 1:
+            defending_number = 1
+        defender_dice = [random.randint(1, 6) for _ in range(min(defending_territory.soldierNumber, defending_number))]
+
+        # Sort the dice rolls
+        attacker_dice.sort(reverse=True)
+        defender_dice.sort(reverse=True)
+
+        print(f"{self.current_player.name} rolled: {attacker_dice}")
+        print(f"{defending_territory.owner.name} rolled: {defender_dice}")
+        attacker_losses, defender_losses = self.combat_losses(attacker_dice, defender_dice)
+        attacking_territory.soldierNumber -= attacker_losses
+        defending_territory.soldierNumber -= defender_losses
+
+        print(defending_territory.soldierNumber)
+
+        if defending_territory.soldierNumber < 1:
+            defending_territory.owner = attacking_territory.owner
+            transfer_options = [str(i) for i in range(1, attacking_territory.soldierNumber)]
+            self.dice = [attacker_dice, defender_dice, defending_territory.owner.name]
+            self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "select_transfer_soldiers", "transfer_options": transfer_options})
+        else:
+            self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "attack_results", "attacker_dice": attacker_dice, "defender_dice": defender_dice, "attacker": attacking_territory.owner.name, "defender": defending_territory.owner.name})
+
+    def combat_losses(self, attacker_dice, defender_dice):
+        attacker_losses, defender_losses = 0, 0
+        couples = [[attacker_dice[0], defender_dice[0]]]
+        if len(attacker_dice) > 1 and len(defender_dice) > 1:
+            couples.append([attacker_dice[1], defender_dice[1]])
+        for couple in couples:
+            if couple[0] > couple[1]:
+                defender_losses += 1
+            else:
+                attacker_losses += 1
+        print(f"attacker losses: {attacker_losses}, defender losses: {defender_losses}")
+        return attacker_losses, defender_losses
+
 
 if __name__ == "__main__":
     HOST = "192.168.86.148"  # Change this to your server's IP address
