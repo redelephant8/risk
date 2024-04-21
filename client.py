@@ -234,7 +234,7 @@ class RiskClient:
                     elif message.get("turn_type") == "attack_results":
                         self.attacker_dice = message.get("attacker_dice")
                         self.defender_dice = message.get("defender_dice")
-                        self.player_message =f"You rolled: {self.attacker_dice}\n{message.get("defender")} rolled: {self.defender_dice}"
+                        self.player_message = f"You rolled: {self.attacker_dice}\n{message.get("defender")} rolled: {self.defender_dice}"
                         self.game_state = "select_soldiers"
                         self.game_stage = "attack_summary"
 
