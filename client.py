@@ -85,25 +85,22 @@ class RiskClient:
                 if self.game_state == "select_territory":
                     self.edit_screen(screen, self.player_message)
                     selected_territory = self.select_territory()
-                    print(selected_territory)
+                    territory_name = "end_combat"
+                    message = ""
+                    if selected_territory:
+                        territory_name = selected_territory.lower_name
 
-                    # Remember THIS NAME CHANGE!!!
                     if self.game_stage == "initial_territories":
-                        message = {"type": "selected_initial_territory", "territory": selected_territory.lower_name}
-                        self.client_socket.sendall(pickle.dumps(message))
+                        message = {"type": "selected_initial_territory", "territory": territory_name}
                     elif self.game_stage == "initial_soldiers":
-                        message = {"type": "selected_initial_soldier_territory", "territory": selected_territory.lower_name}
-                        self.client_socket.sendall(pickle.dumps(message))
+                        message = {"type": "selected_initial_soldier_territory", "territory": territory_name}
                     elif self.game_stage == "receiving_reinforcements":
-                        message = {"type": "selected_reinforcement_territory",
-                                   "territory": selected_territory.lower_name}
-                        self.client_socket.sendall(pickle.dumps(message))
+                        message = {"type": "selected_reinforcement_territory", "territory": territory_name}
                     elif self.game_stage == "attacking_territory":
-                        message = {"type": "selected_attacking_territory", "territory": selected_territory.lower_name}
-                        self.client_socket.sendall(pickle.dumps(message))
+                        message = {"type": "selected_attacking_territory", "territory": territory_name}
                     elif self.game_stage == "defending_territory":
-                        message = {"type": "selected_defending_territory", "territory": selected_territory.lower_name}
-                        self.client_socket.sendall(pickle.dumps(message))
+                        message = {"type": "selected_defending_territory", "territory": territory_name}
+                    self.client_socket.sendall(pickle.dumps(message))
                     self.prev_game_state = self.game_state
 
                 if self.game_state == "select_soldiers":
@@ -125,7 +122,10 @@ class RiskClient:
 
 
                 if self.game_state == "print_board":
-                    self.edit_screen(screen, f"It's {self.current_player}'s turn")
+                    if self.game_stage == "out_of_game":
+                        self.edit_screen(screen, f"All of your territories have been conquered. You are out of the game")
+                    else:
+                        self.edit_screen(screen, f"It's {self.current_player}'s turn")
                     self.prev_game_state = self.game_state
 
             # if self.prev_player != self.current_player and self.game_state == "print_board":
@@ -174,7 +174,6 @@ class RiskClient:
                     self.update_local_board()
                     self.game_state = "print_board"
 
-
                 if message_type == "reselect_territory":
                     print("I need to reselect my territory")
                     self.prev_game_state = "None"
@@ -182,6 +181,8 @@ class RiskClient:
                     self.player_message = message.get("message")
 
                 if message_type == "edit_board":
+                    if message.get("out") == "True":
+                        self.game_stage = "out_of_game"
                     self.territory_information = message.get("territory_info")
                     self.prev_player = self.current_player
                     self.current_player = message.get("current_player")
@@ -237,7 +238,6 @@ class RiskClient:
                         self.player_message = f"You rolled: {self.attacker_dice}\n{message.get("defender")} rolled: {self.defender_dice}"
                         self.game_state = "select_soldiers"
                         self.game_stage = "attack_summary"
-
         except Exception as e:
             print(f"Error in client: {e}")
 
@@ -252,14 +252,11 @@ class RiskClient:
                         if territory.click(mouse_pos):
                             selected_territory = territory
                             selection_valid = True
-                            # edit_screen()
-                        button_rect = pygame.Rect(600, 500, 150, 50)
-                        if button_rect.collidepoint(mouse_pos) and self.combat_stage_flag is True:
-                            selected_territory = None
-                            selection_valid = True
-                            print("BENSAVIRISBEHINDME")
-                            # edit_screen()
-                            self.combat_stage_flag = False
+                        if self.game_stage == "attacking_territory" or self.game_stage == "defending_territory":
+                            button_rect = pygame.Rect(600, 500, 150, 50)
+                            if button_rect.collidepoint(mouse_pos):
+                                selected_territory = None
+                                selection_valid = True
         return selected_territory
     def get_player_name(self, screen):
         pygame.font.init()  # Initialize Pygame font system
@@ -374,12 +371,14 @@ class RiskClient:
         pygame.draw.rect(screen, (0, 0, 255), button_rect)  # Draw the button
 
         # Add text to the button
-        font = pygame.font.SysFont(None, 30)
-        text = font.render("End Combat", True, (255, 255, 255))
-        text_rect = text.get_rect(center=button_rect.center)
-        screen.blit(text, text_rect)
+        if self.game_stage == "attacking_territory" or self.game_stage == "defending_territory":
+            font = pygame.font.SysFont(None, 30)
+            text = font.render("End Combat Phase", True, (255, 255, 255))
+            text_rect = text.get_rect(center=button_rect.center)
+            screen.blit(text, text_rect)
 
         if message:
+            font = pygame.font.SysFont(None, 30)
             text_surface = font.render(message, True, (0, 0, 0))
             screen.blit(text_surface, (width // 2 - text_surface.get_width() // 2, 20))
 
