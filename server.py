@@ -118,7 +118,6 @@ class RiskServer:
                                              "current_player": self.current_player.name}))
                             self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "initial_soldier_addition"})
 
-
                 if message_type == "selected_initial_soldier_territory":
                     selected_initial_soldier_territory = self.board.territories[message.get("territory")]
                     if self.check_selected_initial_soldier_territory(selected_initial_soldier_territory):
@@ -154,11 +153,14 @@ class RiskServer:
 
                 if message_type == "selected_attacking_territory":
                     time.sleep(0.1)
-                    selected_territory = self.board.territories[message.get("territory")]
-                    check_selected, number = self.check_attacking_territory(selected_territory)
-                    if check_selected:
-                        self.current_attacking_territory = selected_territory
-                        self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "select_attacking_soldiers", "number": number})
+                    if message.get("territory") == "end_combat":
+                        self.end_combat_early()
+                    else:
+                        selected_territory = self.board.territories[message.get("territory")]
+                        check_selected, number = self.check_attacking_territory(selected_territory)
+                        if check_selected:
+                            self.current_attacking_territory = selected_territory
+                            self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "select_attacking_soldiers", "number": number})
 
                 if message_type == "selected_attacking_soldiers":
                     time.sleep(0.1)
@@ -167,10 +169,13 @@ class RiskServer:
 
                 if message_type == "selected_defending_territory":
                     time.sleep(0.1)
-                    selected_territory = self.board.territories[message.get("territory")]
-                    if self.check_defending_territory(selected_territory):
-                        self.current_defending_territory = selected_territory
-                        self.attack(self.current_attacking_territory, selected_territory)
+                    if message.get("territory") == "end_combat":
+                        self.end_combat_early()
+                    else:
+                        selected_territory = self.board.territories[message.get("territory")]
+                        if self.check_defending_territory(selected_territory):
+                            self.current_defending_territory = selected_territory
+                            self.attack(self.current_attacking_territory, selected_territory)
 
                 if message_type == "selected_transferring_soldiers":
                     time.sleep(0.1)
@@ -344,10 +349,18 @@ class RiskServer:
         print(defending_territory.soldierNumber)
 
         if defending_territory.soldierNumber < 1:
+            flag = False
+            defending_territory.owner.territories.remove(defending_territory)
+            attacking_territory.owner.territories.append(defending_territory)
+            if len(defending_territory.owner.territories) < 1:
+                flag = defending_territory
             defending_territory.owner = attacking_territory.owner
             transfer_options = [str(i) for i in range(1, attacking_territory.soldierNumber)]
             self.dice = [attacker_dice, defender_dice, defending_territory.owner.name]
             self.current_player.has_conquered = True
+            if flag:
+                packed_territory_info = self.pack_territory_info()
+                self.send_to_client(flag.owner.connection, {"type": "edit_board", "territory_info": packed_territory_info, "current_player": self.current_player.name, "out": "True"})
             self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "select_transfer_soldiers", "transfer_options": transfer_options})
         else:
             self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "attack_results", "attacker_dice": attacker_dice, "defender_dice": defender_dice, "attacker": attacking_territory.owner.name, "defender": defending_territory.owner.name})
@@ -364,6 +377,17 @@ class RiskServer:
                 attacker_losses += 1
         print(f"attacker losses: {attacker_losses}, defender losses: {defender_losses}")
         return attacker_losses, defender_losses
+
+    def end_combat_early(self):
+        packed_territory_info = self.pack_territory_info()
+        self.switch_player()
+        self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info,
+                         "current_player": self.current_player.name}))
+        time.sleep(0.1)
+        self.current_player.soldiers_in_hand = self.current_player.reinforcement_calculator()
+        self.send_to_client(self.current_player.connection,
+                            {"type": "turn_message", "turn_type": "receiving_reinforcements",
+                             "number": self.current_player.soldiers_in_hand, "first_time": "True"})
 
 
 if __name__ == "__main__":
