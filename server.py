@@ -41,8 +41,8 @@ class RiskServer:
             print(f"New connection from {client_socket.getpeername()}")
 
             if not self.game_host:
-                self.game_host = client_address
-                print(f"{client_address} is the host of the game.")
+                self.game_host = client_socket
+                print(f"{client_socket} is the host of the game.")
                 # Sending message to the host
                 self.send_to_client(client_socket, {"type": "join_message", "message": "You are the host."})
 
@@ -214,6 +214,16 @@ class RiskServer:
         # Client disconnected
         print(f"Client {client_socket.getpeername()} disconnected")
         self.connections.remove(client_socket)
+        player = self.find_player(client_socket)
+        self.player_list.remove(player)
+        self.player_names.remove(player.name)
+        if self.game_host == client_socket:
+            self.game_host = None
+            if len(self.connections) > 0:
+                self.game_host = self.connections[0]
+                self.send_to_client(self.game_host, {"type": "join_message", "message": "You are the host."})
+                time.sleep(0.1)
+                self.broadcast({"type": "player_names", "message": self.player_names})
         client_socket.close()
 
     def pack_territory_info(self):
@@ -224,6 +234,11 @@ class RiskServer:
                 color = territory.owner.color
             packed_territory_info[territory_name] = [territory.soldierNumber, color]
         return packed_territory_info
+
+    def find_player(self, connection):
+        for player in self.player_list:
+            if player.connection == connection:
+                return player
 
     def broadcast(self, data, exception=None):
         for connection in self.connections:
