@@ -66,19 +66,17 @@ class RiskServer:
                 if message_type == "name_selection":
                     print(f"Connected player name: {message.get('name')}")
                     self.player_names.append(message.get('name'))
-                    player_color = colors[0]
-                    self.player_list.append(Player(player_color, message.get('name'), client_socket))
-
-                    # self.player_list[message.get('name')] = Player(colors[0], message.get('name'), client_socket)
-                    colors.pop(0)
-                    print(self.player_list)
+                    self.player_list.append(Player("None", message.get('name'), client_socket))
                     time.sleep(0.1)
                     self.broadcast({"type": "player_names", "message": self.player_names})
-                    self.send_to_client(client_socket, {"type": "player_color", "color": player_color})
 
                 if message_type == "start_game":
                     print("Host started game")
                     time.sleep(0.1)
+                    for player in self.player_list:
+                        player.color = colors[0]
+                        colors.pop(0)
+                        self.send_to_client(player.connection, {"type": "player_color", "color": player.color})
                     print(self.board)
                     packed_territory_info = self.pack_territory_info()
                     self.player_number = len(self.player_list)
@@ -223,7 +221,7 @@ class RiskServer:
                 self.game_host = self.connections[0]
                 self.send_to_client(self.game_host, {"type": "join_message", "message": "You are the host."})
                 time.sleep(0.1)
-                self.broadcast({"type": "player_names", "message": self.player_names})
+        self.broadcast({"type": "player_names", "message": self.player_names})
         client_socket.close()
 
     def pack_territory_info(self):
