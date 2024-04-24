@@ -162,7 +162,6 @@ class RiskClient:
                         print("IJIOJDSOIFJSD, it worked")
 
                 if message_type == "player_names":
-                    print("JESUS")
                     self.player_list = message.get("message")
                     # self.player_color = message.get("color")
                     print(message)
@@ -396,9 +395,16 @@ class RiskClient:
         # Determine popup size based on content
         popup_width = 400
         option_height = 40
-        popup_height = 200 + len(options) * option_height  # Adjusted spacing
+
+        # Adjust popup height based on number of options
+        max_options_per_column = 10
+        num_columns = -(-len(options) // max_options_per_column)  # Ceiling division
+        num_rows = min(len(options), max_options_per_column)
+        popup_height = 200 + num_rows * option_height
+
         if dice_results:
             popup_height += 150  # Additional height for dice results
+
         popup_x = (width - popup_width) // 2
         popup_y = (height - popup_height) // 2
         popup_rect = pygame.Rect(popup_x, popup_y, popup_width, popup_height)
@@ -415,14 +421,20 @@ class RiskClient:
         screen.blit(text_surface, text_rect)
 
         # Calculate vertical spacing for options
-        total_option_height = len(options) * option_height
+        total_option_height = num_rows * option_height
         start_y = popup_y + 100 + (popup_height - 100 - total_option_height) // 2
 
+        # Calculate number of options per column
+        options_per_column = (len(options) + num_columns - 1) // num_columns
+
         # Add buttons for each option
-        button_width = 120
+        button_width = min(120, popup_width // num_columns - 20)  # Adjust button width dynamically
         for i, option in enumerate(options):
-            button_x = popup_x + (popup_width - button_width) // 2
-            button_y = start_y + i * option_height
+            column_index = i // options_per_column
+            row_index = i % options_per_column
+            button_x = popup_x + (popup_width // num_columns) * column_index + (
+                        popup_width // num_columns - button_width) // 2
+            button_y = start_y + row_index * option_height
             button_rect = pygame.Rect(button_x, button_y, button_width, option_height)
             pygame.draw.rect(screen, (100, 100, 255), button_rect)
             text_surface = font.render(option, True, (255, 255, 255))
@@ -449,7 +461,12 @@ class RiskClient:
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     mouse_pos = pygame.mouse.get_pos()
                     for i, option in enumerate(options):
-                        button_rect = pygame.Rect(button_x, start_y + i * option_height, button_width, option_height)
+                        column_index = i // options_per_column
+                        row_index = i % options_per_column
+                        button_x = popup_x + (popup_width // num_columns) * column_index + (
+                                    popup_width // num_columns - button_width) // 2
+                        button_y = start_y + row_index * option_height
+                        button_rect = pygame.Rect(button_x, button_y, button_width, option_height)
                         if button_rect.collidepoint(mouse_pos):
                             return i
 
