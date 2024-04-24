@@ -121,10 +121,14 @@ class RiskClient:
                         self.client_socket.sendall(pickle.dumps(message))
                     self.prev_game_state = self.game_state
 
-
                 if self.game_state == "print_board":
                     if self.game_stage == "out_of_game":
                         self.edit_screen(screen, f"All of your territories have been conquered. You are out of the game")
+                    elif self.game_stage == "win_phase":
+                        message = f"{self.current_player} has won the game! They have conquered all of the territories and win the game of Risk!"
+                        if self.current_player == self.player_name:
+                            message = "You win the game!"
+                        self.edit_screen(screen, message)
                     else:
                         self.edit_screen(screen, f"It's {self.current_player}'s turn")
                     self.prev_game_state = self.game_state
@@ -158,7 +162,6 @@ class RiskClient:
                         print("IJIOJDSOIFJSD, it worked")
 
                 if message_type == "player_names":
-                    print("hihihihih")
                     self.player_list = message.get("message")
                     # self.player_color = message.get("color")
                     print(message)
@@ -184,6 +187,8 @@ class RiskClient:
                 if message_type == "edit_board":
                     if message.get("out") == "True":
                         self.game_stage = "out_of_game"
+                    if message.get("win") == "True":
+                        self.game_stage = "win_phase"
                     self.territory_information = message.get("territory_info")
                     self.prev_player = self.current_player
                     self.current_player = message.get("current_player")
@@ -366,12 +371,10 @@ class RiskClient:
             territory.draw(screen, (self.territory_information[territory_name])[1])
             territory.draw_lines_to_neighbors(screen)
 
-        # Draw the button
-        button_rect = pygame.Rect(600, 500, 150, 50)  # Button position and size
-        pygame.draw.rect(screen, (0, 0, 255), button_rect)  # Draw the button
-
         # Add text to the button
         if self.game_stage == "attacking_territory" or self.game_stage == "defending_territory":
+            button_rect = pygame.Rect(600, 500, 150, 50)  # Button position and size
+            pygame.draw.rect(screen, (0, 0, 255), button_rect)  # Draw the button
             font = pygame.font.SysFont(None, 30)
             text = font.render("End Combat Phase", True, (255, 255, 255))
             text_rect = text.get_rect(center=button_rect.center)
