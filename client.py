@@ -162,6 +162,7 @@ class RiskClient:
                         print("IJIOJDSOIFJSD, it worked")
 
                 if message_type == "player_names":
+                    print("JESUS")
                     self.player_list = message.get("message")
                     # self.player_color = message.get("color")
                     print(message)
