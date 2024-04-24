@@ -13,14 +13,6 @@ class RiskServer:
         self.port = port
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.connections = []  # Store client connections
-        self.game_state = {
-            "board": {
-                "territories": {
-                    # Initialize territories here
-                }
-            },
-            "current_player": None
-        }
         self.board = Board()
         self.player_list = []
         self.player_names = []
@@ -54,9 +46,6 @@ class RiskServer:
                 # Sending message to the host
                 self.send_to_client(client_socket, {"type": "join_message", "message": "You are the host."})
 
-
-                # Pretty sure this has to be out of this if statement, we'll check soon
-                # Start a new thread to handle client communication
             client_thread = threading.Thread(target=self.handle_client, args=(client_socket,))
             client_thread.start()
 
@@ -206,7 +195,6 @@ class RiskServer:
                     else:
                         self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "select_attacking_territory"})
 
-
             except Exception as e:
                 import traceback
                 traceback.print_exc()
@@ -226,6 +214,7 @@ class RiskServer:
                 color = territory.owner.color
             packed_territory_info[territory_name] = [territory.soldierNumber, color]
         return packed_territory_info
+
     def broadcast(self, data, exception=None):
         for connection in self.connections:
             if connection == exception:
@@ -256,8 +245,6 @@ class RiskServer:
                     self.current_player = self.player_list[0]
                 else:
                     self.current_player = self.player_list[current_idx + 1]
-            # self.broadcast({"type": "current_player", "current_player_name": self.current_player.name}, self.current_player.connection)
-            # time.sleep(0.1)
 
     def check_selected_initial_territory(self, territory):
         if territory.owner is None:
@@ -353,14 +340,14 @@ class RiskServer:
             defending_territory.owner.territories.remove(defending_territory)
             attacking_territory.owner.territories.append(defending_territory)
             if len(defending_territory.owner.territories) < 1:
-                flag = defending_territory
+                flag = defending_territory.owner
             defending_territory.owner = attacking_territory.owner
             transfer_options = [str(i) for i in range(1, attacking_territory.soldierNumber)]
             self.dice = [attacker_dice, defender_dice, defending_territory.owner.name]
             self.current_player.has_conquered = True
             if flag:
                 packed_territory_info = self.pack_territory_info()
-                self.send_to_client(flag.owner.connection, {"type": "edit_board", "territory_info": packed_territory_info, "current_player": self.current_player.name, "out": "True"})
+                self.send_to_client(flag.connection, {"type": "edit_board", "territory_info": packed_territory_info, "current_player": self.current_player.name, "out": "True"})
             self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "select_transfer_soldiers", "transfer_options": transfer_options})
         else:
             self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "attack_results", "attacker_dice": attacker_dice, "defender_dice": defender_dice, "attacker": attacking_territory.owner.name, "defender": defending_territory.owner.name})
