@@ -225,7 +225,6 @@ class RiskClient:
                         self.game_state = "select_territory"
                         self.game_stage = "defending_territory"
                     elif message.get("turn_type") == "select_transfer_soldiers":
-                        print("WEWEWERWERWERWERWEr")
                         self.attacker_dice = message.get("attacker_dice")
                         self.defender_dice = message.get("defender_dice")
                         self.player_message = "Please select how many soldiers you will move over"
