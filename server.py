@@ -177,28 +177,33 @@ class RiskServer:
 
                 if message_type == "selected_attack_option":
                     time.sleep(0.1)
-                    result_index = message.get("number")
-                    if result_index == 1:
-                        if self.current_player.has_conquered:
-                            card = self.cards.pop(0)
-                            self.current_player.cards[card] = self.current_player.cards[card] + 1
-                            print(card)
-                        self.switch_player()
-                        if self.current_player.isOut:
-                            while self.current_player.isOut:
-                                self.switch_player()
-                    packed_territory_info = self.pack_territory_info()
-                    print(packed_territory_info)
-                    self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info,
-                                     "current_player": self.current_player.name}))
-                    time.sleep(0.1)
-                    self.current_player.has_conquered = False
-                    self.current_player.soldiers_in_hand = self.current_player.reinforcement_calculator()
-                    if result_index == 1:
-                        self.send_to_client(self.current_player.connection,
-                                            {"type": "turn_message", "turn_type": "receiving_reinforcements", "number": self.current_player.soldiers_in_hand, "first_time": "True"})
+                    if self.check_win():
+                        packed_territory_info = self.pack_territory_info()
+                        self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info,
+                                     "current_player": self.current_player.name, "win": "True"}))
                     else:
-                        self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "select_attacking_territory"})
+                        result_index = message.get("number")
+                        if result_index == 1:
+                            if self.current_player.has_conquered:
+                                card = self.cards.pop(0)
+                                self.current_player.cards[card] = self.current_player.cards[card] + 1
+                                print(card)
+                            self.switch_player()
+                            if self.current_player.isOut:
+                                while self.current_player.isOut:
+                                    self.switch_player()
+                        packed_territory_info = self.pack_territory_info()
+                        print(packed_territory_info)
+                        self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info,
+                                         "current_player": self.current_player.name}))
+                        time.sleep(0.1)
+                        self.current_player.has_conquered = False
+                        self.current_player.soldiers_in_hand = self.current_player.reinforcement_calculator()
+                        if result_index == 1:
+                            self.send_to_client(self.current_player.connection,
+                                                {"type": "turn_message", "turn_type": "receiving_reinforcements", "number": self.current_player.soldiers_in_hand, "first_time": "True"})
+                        else:
+                            self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "select_attacking_territory"})
 
             except Exception as e:
                 import traceback
@@ -384,6 +389,15 @@ class RiskServer:
         self.send_to_client(self.current_player.connection,
                             {"type": "turn_message", "turn_type": "receiving_reinforcements",
                              "number": self.current_player.soldiers_in_hand, "first_time": "True"})
+
+    def check_win(self):
+        count = 0
+        for player in self.player_list:
+            if not player.isOut:
+                count += 1
+        if count == 1:
+            return True
+        return False
 
 
 if __name__ == "__main__":
