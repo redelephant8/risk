@@ -100,7 +100,8 @@ class RiskClient:
                         message = {"type": "selected_attacking_territory", "territory": territory_name}
                     elif self.game_stage == "defending_territory":
                         message = {"type": "selected_defending_territory", "territory": territory_name}
-                    self.client_socket.sendall(pickle.dumps(message))
+                    if message != "":
+                        self.client_socket.sendall(pickle.dumps(message))
                     self.prev_game_state = self.game_state
 
                 if self.game_state == "select_soldiers":
