@@ -122,6 +122,8 @@ class RiskServer:
                         if self.players_remaining > 0:
                             self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "initial_soldier_addition"})
                         else:
+                            for player in self.player_list:
+                                player.isOut = False
                             self.current_player = self.player_list[0]
                             self.current_player.soldiers_in_hand = self.current_player.reinforcement_calculator()
                             self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info,
@@ -182,6 +184,9 @@ class RiskServer:
                             self.current_player.cards[card] = self.current_player.cards[card] + 1
                             print(card)
                         self.switch_player()
+                        if self.current_player.isOut:
+                            while self.current_player.isOut:
+                                self.switch_player()
                     packed_territory_info = self.pack_territory_info()
                     print(packed_territory_info)
                     self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info,
@@ -341,6 +346,7 @@ class RiskServer:
             attacking_territory.owner.territories.append(defending_territory)
             if len(defending_territory.owner.territories) < 1:
                 flag = defending_territory.owner
+                defending_territory.owner.isOut = True
             defending_territory.owner = attacking_territory.owner
             transfer_options = [str(i) for i in range(1, attacking_territory.soldierNumber)]
             self.dice = [attacker_dice, defender_dice, defending_territory.owner.name]
@@ -368,6 +374,9 @@ class RiskServer:
     def end_combat_early(self):
         packed_territory_info = self.pack_territory_info()
         self.switch_player()
+        if self.current_player.isOut:
+            while self.current_player.isOut:
+                self.switch_player()
         self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info,
                          "current_player": self.current_player.name}))
         time.sleep(0.1)
