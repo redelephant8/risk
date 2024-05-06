@@ -33,6 +33,20 @@ class Territory:
                 flag = True
         return flag
 
+    def check_neighbors_for_player(self, player):
+        flag = False
+        for neighbor in self.neighbors:
+            if neighbor.owner == player:
+                flag = True
+        return flag
+
+    def neighbor_list_player(self, player):
+        neighbor_list = []
+        for neighbor in self.neighbors:
+            if neighbor.owner == player:
+                neighbor_list.append(neighbor)
+        return neighbor_list
+
     def draw_lines_to_neighbors(self, screen):
         for neighbor in self.neighbors:
             pygame.draw.line(screen, (0, 0, 0), self.coordinates, neighbor.coordinates, 2)
