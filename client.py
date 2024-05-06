@@ -136,6 +136,8 @@ class RiskClient:
                         self.client_socket.sendall(pickle.dumps(message))
                     elif self.game_stage == "card_series":
                         result_options = ["Yes", "No"]
+                        if self.number == 1:
+                            result_options = ["Yes"]
                         result_index = self.create_popup(screen, self.player_message, result_options)
                         message = {"type": "selected_card_series", "number": result_index}
                         self.client_socket.sendall(pickle.dumps(message))
@@ -286,6 +288,7 @@ class RiskClient:
                         self.game_stage = "fortify_territory_new_home"
                     elif message.get("turn_type") == "card_turn_in":
                         self.player_message = f"Would you like to turn in a card set for {message.get("number")} additional reinforcements?"
+                        self.number = message.get("forced")
                         self.game_state = "select_soldiers"
                         self.game_stage = "card_series"
         except Exception as e:
