@@ -149,8 +149,9 @@ class RiskServer:
                             self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info,
                                              "current_player": self.current_player.name}))
                             time.sleep(0.1)
-                            if self.has_card_series() and self.card_reinforcements != []:
-                                self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "card_turn_in", "number": self.card_reinforcements[0]})
+                            card_series, forced = self.has_card_series()
+                            if card_series and self.card_reinforcements != []:
+                                self.send_to_client(self.current_player.connection,{"type": "turn_message", "turn_type": "card_turn_in", "number": self.card_reinforcements[0], "forced": forced})
                             else:
                                 self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "receiving_reinforcements", "number": self.current_player.soldiers_in_hand, "first_time": "True"})
 
@@ -275,10 +276,11 @@ class RiskServer:
                     self.current_player.has_conquered = False
                     self.current_player.soldiers_in_hand = self.current_player.reinforcement_calculator()
                     if result_index == 1:
-                        if self.has_card_series() and self.card_reinforcements != []:
+                        card_series, forced = self.has_card_series()
+                        if card_series and self.card_reinforcements != []:
                             self.send_to_client(self.current_player.connection,
                                                 {"type": "turn_message", "turn_type": "card_turn_in",
-                                                 "number": self.card_reinforcements[0]})
+                                                 "number": self.card_reinforcements[0], "forced": forced})
                         else:
                             self.send_to_client(self.current_player.connection,
                                                {"type": "turn_message", "turn_type": "receiving_reinforcements", "number": self.current_player.soldiers_in_hand, "first_time": "True"})
@@ -552,9 +554,11 @@ class RiskServer:
         time.sleep(0.1)
         self.current_player.has_conquered = False
         self.current_player.soldiers_in_hand = self.current_player.reinforcement_calculator()
-        if self.has_card_series() and self.card_reinforcements != []:
+        card_series, forced = self.has_card_series()
+        if card_series and self.card_reinforcements != []:
             self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "card_turn_in",
-                                                                 "number": self.card_reinforcements[0]})
+                                                                 "number": self.card_reinforcements[0],
+                                                                 "forced": forced})
         else:
             self.send_to_client(self.current_player.connection,
                              {"type": "turn_message", "turn_type": "receiving_reinforcements",
@@ -583,12 +587,12 @@ class RiskServer:
         print(f"{self.current_player.name}:  infantry: {infantry},   cavalry: {cavalry},   artillery: {artillery}")
         card_total = infantry + cavalry + artillery
         if card_total == 5:
-            return True
+            return True, 1
         if infantry >= 1 and cavalry >= 1 and artillery >= 1:
-            return True
+            return True, 0
         if infantry >= 3 or cavalry >= 3 or artillery >= 3:
-            return True
-        return False
+            return True, 0
+        return False, 0
 
 
 
