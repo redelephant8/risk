@@ -203,7 +203,10 @@ class RiskServer:
                     else:
                         result_index = message.get("number")
                         if result_index == 1:
-                            self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "fortify_position"})
+                            if self.check_if_can_fortify():
+                                self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "fortify_position"})
+                            else:
+                                self.end_turn()
                         else:
                             packed_territory_info = self.pack_territory_info()
                             print(packed_territory_info)
@@ -517,6 +520,13 @@ class RiskServer:
         if count == 1:
             return True
         return False
+
+    def check_if_can_fortify(self):
+        flag = False
+        for territory in self.current_player.territories:
+            if territory.soldierNumber > 1 and territory.check_neighbors_for_player(self.current_player):
+                flag = True
+        return flag
 
 
 if __name__ == "__main__":
