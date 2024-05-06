@@ -161,6 +161,7 @@ class RiskServer:
                         self.send_to_client(self.current_player.connection,{"type": "turn_message", "turn_type": "receiving_reinforcements", "number": self.current_player.soldiers_in_hand, "first_time": "True"})
                     else:
                         self.current_player.soldiers_in_hand += self.card_reinforcements.pop(0)
+                        self.remove_cards()
                         packed_territory_info = self.pack_territory_info()
                         print(packed_territory_info)
                         self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info,
@@ -593,6 +594,21 @@ class RiskServer:
         if infantry >= 3 or cavalry >= 3 or artillery >= 3:
             return True, 0
         return False, 0
+
+    def remove_cards(self):
+        infantry = self.current_player.cards["infantry"]
+        cavalry = self.current_player.cards["cavalry"]
+        artillery = self.current_player.cards["artillery"]
+        if infantry >= 3:
+            self.current_player.cards["infantry"] -= 3
+        elif cavalry >= 3:
+            self.current_player.cards["cavalry"] -= 3
+        elif artillery >= 3:
+            self.current_player.cards["artillery"] -= 3
+        else:
+            self.current_player.cards["infantry"] -= 1
+            self.current_player.cards["cavalry"] -= 1
+            self.current_player.cards["artillery"] -= 1
 
 
 
