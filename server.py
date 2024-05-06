@@ -27,6 +27,7 @@ class RiskServer:
         self.dice = []
         self.fortify = []
         self.cards = ["infantry"]*14 + ["cavalry"]*14 + ["artillery"]*14
+        self.card_reinforcements = [4, 6, 8, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60]
 
     def start(self):
         self.server_socket.bind((self.host, self.port))
@@ -148,7 +149,23 @@ class RiskServer:
                             self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info,
                                              "current_player": self.current_player.name}))
                             time.sleep(0.1)
-                            self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "receiving_reinforcements", "number": self.current_player.soldiers_in_hand, "first_time": "True"})
+                            if self.has_card_series() and self.card_reinforcements != []:
+                                self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "card_turn_in", "number": self.card_reinforcements[0]})
+                            else:
+                                self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "receiving_reinforcements", "number": self.current_player.soldiers_in_hand, "first_time": "True"})
+
+                if message_type == "selected_card_series":
+                    result_index = message.get("number")
+                    if result_index == 1:
+                        self.send_to_client(self.current_player.connection,{"type": "turn_message", "turn_type": "receiving_reinforcements", "number": self.current_player.soldiers_in_hand, "first_time": "True"})
+                    else:
+                        self.current_player.soldiers_in_hand += self.card_reinforcements.pop(0)
+                        packed_territory_info = self.pack_territory_info()
+                        print(packed_territory_info)
+                        self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info,
+                                         "current_player": self.current_player.name}))
+                        time.sleep(0.1)
+                        self.send_to_client(self.current_player.connection,{"type": "turn_message", "turn_type": "receiving_reinforcements", "number": self.current_player.soldiers_in_hand, "first_time": "True"})
 
                 if message_type == "selected_reinforcement_territory":
                     time.sleep(0.1)
@@ -189,7 +206,16 @@ class RiskServer:
                 if message_type == "selected_defending_territory":
                     time.sleep(0.1)
                     if message.get("territory") == "end_combat":
-                        self.end_combat_early()
+                        if self.check_if_can_fortify():
+                            packed_territory_info = self.pack_territory_info()
+                            print(packed_territory_info)
+                            self.broadcast({"type": "edit_board", "territory_info": packed_territory_info,
+                                            "current_player": self.current_player.name})
+                            time.sleep(0.1)
+                            self.send_to_client(self.current_player.connection,
+                                                {"type": "turn_message", "turn_type": "fortify_position"})
+                        else:
+                            self.end_turn()
                     else:
                         selected_territory = self.board.territories[message.get("territory")]
                         if self.check_defending_territory(selected_territory):
@@ -249,9 +275,13 @@ class RiskServer:
                     self.current_player.has_conquered = False
                     self.current_player.soldiers_in_hand = self.current_player.reinforcement_calculator()
                     if result_index == 1:
-                        self.send_to_client(self.current_player.connection,
-                                            {"type": "turn_message", "turn_type": "receiving_reinforcements",
-                                             "number": self.current_player.soldiers_in_hand, "first_time": "True"})
+                        if self.has_card_series() and self.card_reinforcements != []:
+                            self.send_to_client(self.current_player.connection,
+                                                {"type": "turn_message", "turn_type": "card_turn_in",
+                                                 "number": self.card_reinforcements[0]})
+                        else:
+                            self.send_to_client(self.current_player.connection,
+                                               {"type": "turn_message", "turn_type": "receiving_reinforcements", "number": self.current_player.soldiers_in_hand, "first_time": "True"})
                     else:
                         self.fortify = []
                         self.send_to_client(self.current_player.connection,
@@ -492,19 +522,19 @@ class RiskServer:
         print(f"attacker losses: {attacker_losses}, defender losses: {defender_losses}")
         return attacker_losses, defender_losses
 
-    def end_combat_early(self):
-        packed_territory_info = self.pack_territory_info()
-        self.switch_player()
-        if self.current_player.isOut:
-            while self.current_player.isOut:
-                self.switch_player()
-        self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info,
-                         "current_player": self.current_player.name}))
-        time.sleep(0.1)
-        self.current_player.soldiers_in_hand = self.current_player.reinforcement_calculator()
-        self.send_to_client(self.current_player.connection,
-                            {"type": "turn_message", "turn_type": "receiving_reinforcements",
-                             "number": self.current_player.soldiers_in_hand, "first_time": "True"})
+    # def end_combat_early(self):
+    #     packed_territory_info = self.pack_territory_info()
+    #     self.switch_player()
+    #     if self.current_player.isOut:
+    #         while self.current_player.isOut:
+    #             self.switch_player()
+    #     self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info,
+    #                      "current_player": self.current_player.name}))
+    #     time.sleep(0.1)
+    #     self.current_player.soldiers_in_hand = self.current_player.reinforcement_calculator()
+    #     self.send_to_client(self.current_player.connection,
+    #                         {"type": "turn_message", "turn_type": "receiving_reinforcements",
+    #                          "number": self.current_player.soldiers_in_hand, "first_time": "True"})
 
     def end_turn(self):
         if self.current_player.has_conquered:
@@ -522,9 +552,13 @@ class RiskServer:
         time.sleep(0.1)
         self.current_player.has_conquered = False
         self.current_player.soldiers_in_hand = self.current_player.reinforcement_calculator()
-        self.send_to_client(self.current_player.connection,
-                         {"type": "turn_message", "turn_type": "receiving_reinforcements",
-                             "number": self.current_player.soldiers_in_hand, "first_time": "True"})
+        if self.has_card_series() and self.card_reinforcements != []:
+            self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "card_turn_in",
+                                                                 "number": self.card_reinforcements[0]})
+        else:
+            self.send_to_client(self.current_player.connection,
+                             {"type": "turn_message", "turn_type": "receiving_reinforcements",
+                                 "number": self.current_player.soldiers_in_hand, "first_time": "True"})
 
     def check_win(self):
         count = 0
@@ -541,6 +575,21 @@ class RiskServer:
             if territory.soldierNumber > 1 and territory.check_neighbors_for_player(self.current_player):
                 flag = True
         return flag
+
+    def has_card_series(self):
+        infantry = self.current_player.cards["infantry"]
+        cavalry = self.current_player.cards["cavalry"]
+        artillery = self.current_player.cards["artillery"]
+        print(f"{self.current_player.name}:  infantry: {infantry},   cavalry: {cavalry},   artillery: {artillery}")
+        card_total = infantry + cavalry + artillery
+        if card_total == 5:
+            return True
+        if infantry >= 1 and cavalry >= 1 and artillery >= 1:
+            return True
+        if infantry >= 3 or cavalry >= 3 or artillery >= 3:
+            return True
+        return False
+
 
 
 if __name__ == "__main__":
