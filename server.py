@@ -204,6 +204,11 @@ class RiskServer:
                         result_index = message.get("number")
                         if result_index == 1:
                             if self.check_if_can_fortify():
+                                packed_territory_info = self.pack_territory_info()
+                                print(packed_territory_info)
+                                self.broadcast({"type": "edit_board", "territory_info": packed_territory_info,
+                                                "current_player": self.current_player.name})
+                                time.sleep(0.1)
                                 self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "fortify_position"})
                             else:
                                 self.end_turn()
