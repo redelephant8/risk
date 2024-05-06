@@ -1,5 +1,7 @@
 import socket
 import pickle
+import sys
+
 import pygame
 from pygame.locals import *
 import threading
@@ -100,6 +102,10 @@ class RiskClient:
                         message = {"type": "selected_attacking_territory", "territory": territory_name}
                     elif self.game_stage == "defending_territory":
                         message = {"type": "selected_defending_territory", "territory": territory_name}
+                    elif self.game_stage == "fortify_territory_home":
+                        message = {"type": "selected_fortify_territory_home", "territory": territory_name}
+                    elif self.game_stage == "fortify_territory_new_home":
+                        message = {"type": "selected_fortify_territory_new_home", "territory": territory_name}
                     if message != "":
                         self.client_socket.sendall(pickle.dumps(message))
                     self.prev_game_state = self.game_state
@@ -118,6 +124,15 @@ class RiskClient:
                         result_index = self.create_popup(screen, self.player_message, result_options,
                                                          dice_results=self.attacker_dice + self.defender_dice)
                         message = {"type": "selected_attack_option", "number": result_index}
+                        self.client_socket.sendall(pickle.dumps(message))
+                    elif self.game_stage == "select_if_fortify":
+                        result_options = ["Fortify", "End Turn"]
+                        result_index = self.create_popup(screen, self.player_message, result_options)
+                        message = {"type": "selected_if_fortify", "number": result_index}
+                        self.client_socket.sendall(pickle.dumps(message))
+                    elif self.game_stage == "select_fortify_soldiers":
+                        number = self.create_popup(screen, self.player_message, self.number) + 1
+                        message = {"type": "selected_fortify_soldiers", "number": number}
                         self.client_socket.sendall(pickle.dumps(message))
                     self.prev_game_state = self.game_state
 
@@ -155,6 +170,10 @@ class RiskClient:
                 message = pickle.loads(data)
                 message_type = message.get("type")
                 print(f"Message type: {message_type}")
+
+                if message_type == "max_players_reached":
+                    pygame.quit()
+                    sys.exit()
 
                 if message_type == "join_message":
                     if message.get("message") == "You are the host.":
@@ -240,9 +259,26 @@ class RiskClient:
                     elif message.get("turn_type") == "attack_results":
                         self.attacker_dice = message.get("attacker_dice")
                         self.defender_dice = message.get("defender_dice")
-                        self.player_message = f"You rolled: {self.attacker_dice}\n{message.get("defender")} rolled: {self.defender_dice}"
+                        self.player_message = f"You rolled: {self.attacker_dice}; {message.get("defender")} rolled: {self.defender_dice}"
                         self.game_state = "select_soldiers"
                         self.game_stage = "attack_summary"
+                    elif message.get("turn_type") == "fortify_position":
+                        self.player_message = "Would you like to fortify your position?"
+                        self.game_state = "select_soldiers"
+                        self.game_stage = "select_if_fortify"
+                    elif message.get("turn_type") == "select_fortify_territory":
+                        self.player_message = "Please select one of your territories to move soldiers from: "
+                        self.game_state = "select_territory"
+                        self.game_stage = "fortify_territory_home"
+                    elif message.get("turn_type") == "select_fortify_territory_soldier_number":
+                        self.player_message = "Please select how many soldiers to send to the new territory"
+                        self.number = message.get("transfer_options")
+                        self.game_state = "select_soldiers"
+                        self.game_stage = "select_fortify_soldiers"
+                    elif message.get("turn_type") == "select_fortify_territory_new_home":
+                        self.player_message = "Please select which territory you want to fortify"
+                        self.game_state = "select_territory"
+                        self.game_stage = "fortify_territory_new_home"
         except Exception as e:
             print(f"Error in client: {e}")
 
@@ -441,17 +477,17 @@ class RiskClient:
             text_rect = text_surface.get_rect(center=button_rect.center)
             screen.blit(text_surface, text_rect)
 
-        # Draw dice results
-        if dice_results:
-            dice_text = "Dice Results:"
-            dice_text_surface = font.render(dice_text, True, (0, 0, 0))
-            dice_text_rect = dice_text_surface.get_rect(center=(popup_x + popup_width // 2, popup_y + 150))
-            screen.blit(dice_text_surface, dice_text_rect)
-
-            dice_x = popup_x + (popup_width - DICE_SIZE * len(dice_results)) // 2
-            dice_y = popup_y + popup_height - 120
-            for i, result in enumerate(dice_results):
-                self.draw_dice(screen, result, dice_x + i * (DICE_SIZE + 10), dice_y)
+        # # Draw dice results
+        # if dice_results:
+        #     dice_text = "Dice Results:"
+        #     dice_text_surface = font.render(dice_text, True, (0, 0, 0))
+        #     dice_text_rect = dice_text_surface.get_rect(center=(popup_x + popup_width // 2, popup_y + 150))
+        #     screen.blit(dice_text_surface, dice_text_rect)
+        #
+        #     dice_x = popup_x + (popup_width - DICE_SIZE * len(dice_results)) // 2
+        #     dice_y = popup_y + popup_height - 120
+        #     for i, result in enumerate(dice_results):
+        #         self.draw_dice(screen, result, dice_x + i * (DICE_SIZE + 10), dice_y)
 
         pygame.display.flip()
 
