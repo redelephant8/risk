@@ -35,19 +35,41 @@ class RiskServer:
         print(f"Server is listening on {self.host}:{self.port}")
 
         while True:
-            client_socket, client_address = self.server_socket.accept()
-            #HERE ADD TO BLOCK MORE THAN 6 CLIENTS JOINING
-            self.connections.append(client_socket)
-            print(f"New connection from {client_socket.getpeername()}")
+            print(f"connections length: {len(self.connections)}")
+            if len(self.connections) >= 6:
+                client_socket, client_address = self.server_socket.accept()
+                if len(self.connections) < 6:
+                    self.connections.append(client_socket)
+                    print(f"New connection from {client_socket.getpeername()}")
 
-            if not self.game_host:
-                self.game_host = client_socket
-                print(f"{client_socket} is the host of the game.")
-                # Sending message to the host
-                self.send_to_client(client_socket, {"type": "join_message", "message": "You are the host."})
+                    if not self.game_host:
+                        self.game_host = client_socket
+                        print(f"{client_socket} is the host of the game.")
+                        # Sending message to the host
+                        self.send_to_client(client_socket, {"type": "join_message", "message": "You are the host."})
 
-            client_thread = threading.Thread(target=self.handle_client, args=(client_socket,))
-            client_thread.start()
+                    client_thread = threading.Thread(target=self.handle_client, args=(client_socket,))
+                    client_thread.start()
+                    continue
+                print("Rejecting connection: Maximum number of players reached.")
+                self.send_to_client(client_socket, {"type": "max_players_reached"})
+                client_socket.close()
+            else:
+                client_socket, client_address = self.server_socket.accept()
+                #HERE ADD TO BLOCK MORE THAN 6 CLIENTS JOINING
+                self.connections.append(client_socket)
+                print(f"New connection from {client_socket.getpeername()}")
+
+                if not self.game_host:
+                    self.game_host = client_socket
+                    print(f"{client_socket} is the host of the game.")
+                    # Sending message to the host
+                    self.send_to_client(client_socket, {"type": "join_message", "message": "You are the host."})
+
+                client_thread = threading.Thread(target=self.handle_client, args=(client_socket,))
+                client_thread.start()
+
+
 
     def handle_client(self, client_socket):
         while True:
@@ -365,9 +387,9 @@ class RiskServer:
             if len(defending_territory.owner.territories) < 1:
                 flag = defending_territory.owner
                 defending_territory.owner.isOut = True
-            defending_territory.owner = attacking_territory.owner
             transfer_options = [str(i) for i in range(1, attacking_territory.soldierNumber)]
             self.dice = [attacker_dice, defender_dice, defending_territory.owner.name]
+            defending_territory.owner = attacking_territory.owner
             self.current_player.has_conquered = True
             if flag:
                 packed_territory_info = self.pack_territory_info()
