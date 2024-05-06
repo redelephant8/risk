@@ -164,7 +164,16 @@ class RiskServer:
                 if message_type == "selected_attacking_territory":
                     time.sleep(0.1)
                     if message.get("territory") == "end_combat":
-                        self.end_combat_early()
+                        if self.check_if_can_fortify():
+                            packed_territory_info = self.pack_territory_info()
+                            print(packed_territory_info)
+                            self.broadcast({"type": "edit_board", "territory_info": packed_territory_info,
+                                            "current_player": self.current_player.name})
+                            time.sleep(0.1)
+                            self.send_to_client(self.current_player.connection,
+                                                {"type": "turn_message", "turn_type": "fortify_position"})
+                        else:
+                            self.end_turn()
                     else:
                         selected_territory = self.board.territories[message.get("territory")]
                         check_selected, number = self.check_attacking_territory(selected_territory)
