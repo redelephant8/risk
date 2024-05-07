@@ -51,7 +51,7 @@ class Board:
         self.territories["indonesia"] = Territory("Indonesia", "indonesia", "oceania", 50, 350, "indonesia.png")
         self.territories["new_guinea"] = Territory("New Guinea", "new_guinea", "oceania", 50, 350, "new_guinea.png")
         self.territories["western_australia"] = Territory("Western Australia", "western_australia", "oceania", 50, 350, "western_australia.png")
-        self.territories["eastern_australia"] = Territory("Eastern Australia", "eastern_australia", "oceania", 50, 350, "eastern_australia.png")
+        self.territories["eastern_australia"] = Territory("Eastern Australia", "eastern_australia", "oceania", 50, 350, "australia.png")
 
 
 
