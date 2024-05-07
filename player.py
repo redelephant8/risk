@@ -16,7 +16,7 @@ class Player:
     def reinforcement_calculator(self):
         if len(self.territories) < 11:
             return 3
-        return len(self.territories) % 3
+        return int(len(self.territories) / 3)
 
     def create_neighbor_web(self, territory):
         self.available_neighbors_list = []
