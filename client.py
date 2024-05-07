@@ -7,7 +7,7 @@ from pygame.locals import *
 import threading
 from board import Board
 
-width, height = 800, 600
+width, height = 1000, 600
 DICE_SIZE = 10
 DICE_OFFSET_X = 50
 DICE_OFFSET_Y = 50
@@ -51,7 +51,7 @@ class RiskClient:
         self.defender_dice = None
 
     def start(self):
-        width, height = 800, 600
+        width, height = 1000, 600
         screen = pygame.display.set_mode((width, height))
         pygame.display.set_caption("Risk")
         clock = pygame.time.Clock()  # Create a clock object for controlling FPS
@@ -357,7 +357,7 @@ class RiskClient:
                         else:
                             text += event.unicode
 
-            screen.fill((255, 255, 255))  # White background
+            screen.fill((194, 236, 237))  # White background
             # Render the welcome message.
             draw_text("Welcome!", font, (0, 0, 0), screen, 300, 250)
             # Render the current text.
@@ -380,7 +380,7 @@ class RiskClient:
         font = pygame.font.Font(None, 36)  # Font for rendering text
         print("flipflopflipflop")
 
-        screen.fill((255, 255, 255))  # Fill the screen with white color
+        screen.fill((194, 236, 237))  # Fill the screen with white color
 
         # Display title
         draw_text("Players in the Lobby:", font, (0, 0, 0), screen, 300, 50)
@@ -412,7 +412,7 @@ class RiskClient:
 
     def edit_screen(self, screen, message=None):
         # Clear the screen
-        screen.fill((255, 255, 255))  # Fill with white background
+        screen.fill((194, 236, 237))  # Fill with white background
 
         # Draw the territories
         for territory_name, territory in self.board.territories.items():
