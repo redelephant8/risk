@@ -10,51 +10,65 @@ class Board:
         self.setup_neighbors()
 
     def initialize_territories(self):
+        # North America
         self.territories["alaska"] = Territory("Alaska", "alaska", "america", 50, 50, "alaska.png")
-        self.territories["north_territory"] = Territory("North Territory", "north_territory", "america", 200, 50,
+        self.territories["north_territory"] = Territory("North Territory", "north_territory", "america", 150, 50,
                                                         "north_territory.png")
-        self.territories["greenland"] = Territory("Greenland", "greenland", "america", 350, 50, "greenland.png")
-        self.territories["alberta"] = Territory("Alberta", "alberta", "america", 50, 200, "alberta.png")
-        self.territories["ontario"] = Territory("Ontario", "ontario", "america", 200, 200, "ontario.png")
-        self.territories["quebec"] = Territory("Quebec", "quebec", "america", 350, 200, "quebec.png")
-        self.territories["united_states"] = Territory("United States", "united_states", "america", 50, 350, "united_states.png")
-        self.territories["central_america"] = Territory("Central America", "central_america", "america", 200, 350,
+        self.territories["greenland"] = Territory("Greenland", "greenland", "america", 250, 50, "greenland.png")
+        self.territories["alberta"] = Territory("Alberta", "alberta", "america", 50, 150, "alberta.png")
+        self.territories["ontario"] = Territory("Ontario", "ontario", "america", 150, 150, "ontario.png")
+        self.territories["quebec"] = Territory("Quebec", "quebec", "america", 250, 150, "quebec.png")
+        self.territories["united_states"] = Territory("United States", "united_states", "america", 150, 250,
+                                                      "united_states.png")
+        self.territories["central_america"] = Territory("Central America", "central_america", "america", 50, 250,
                                                         "central_america.png")
+
+        # South America
         self.territories["venezuela"] = Territory("Venezuela", "venezuela", "south_america", 50, 350, "venezuela.png")
-        self.territories["brazil"] = Territory("Brazil", "brazil", "south_america", 50, 350, "brazil.png")
-        self.territories["peru"] = Territory("Peru", "peru", "south_america", 50, 350, "peru.png")
-        self.territories["iceland"] = Territory("Iceland", "iceland", "europe", 50, 350, "iceland.png")
-        self.territories["scandinavia"] = Territory("Scandinavia", "scandinavia", "europe", 50, 350, "scandinavia.png")
-        self.territories["great_britain"] = Territory("Great Britain", "great_britain", "europe", 50, 350, "great_britain.png")
-        self.territories["poland"] = Territory("Poland", "poland", "europe", 50, 350, "poland.png")
-        self.territories["greece"] = Territory("Greece", "greece", "europe", 50, 350, "greece.png")
-        self.territories["spain"] = Territory("Spain", "spain", "europe", 50, 350, "spain.png")
-        self.territories["ukraine"] = Territory("Ukraine", "ukraine", "europe", 50, 350, "ukraine.png")
-        self.territories["morocco"] = Territory("Morocco", "morocco", "africa", 50, 350, "morocco.png")
-        self.territories["egypt"] = Territory("Egypt", "egypt", "africa", 50, 350, "egypt.png")
-        self.territories["sudan"] = Territory("Sudan", "sudan", "africa", 50, 350, "sudan.png")
-        self.territories["congo"] = Territory("Congo", "congo", "africa", 50, 350, "congo.png")
-        self.territories["south_africa"] = Territory("South Africa", "south_africa", "africa", 50, 350, "south_africa.png")
-        self.territories["madagascar"] = Territory("Madagascar", "madagascar", "africa", 50, 350, "madagascar.png")
-        self.territories["siberia"] = Territory("Siberia", "siberia", "asia", 50, 350, "siberia.png")
-        self.territories["yakutsk"] = Territory("Yakutsk", "yakutsk", "asia", 50, 350, "yakutsk.png")
-        self.territories["kamchatka"] = Territory("Kamchatka", "kamchatka", "asia", 50, 350, "kamchatka.png")
-        self.territories["ural"] = Territory("Ural", "ural", "asia", 50, 350, "ural.png")
-        self.territories["irkutsk"] = Territory("Irkutsk", "irkutsk", "asia", 50, 350, "irkutsk.png")
-        self.territories["mongolia"] = Territory("Mongolia", "mongolia", "asia", 50, 350, "mongolia.png")
-        self.territories["japan"] = Territory("Japan", "japan", "asia", 50, 350, "japan.png")
-        self.territories["afghanistan"] = Territory("Afghanistan", "afghanistan", "asia", 50, 350, "afghanistan.png")
-        self.territories["china"] = Territory("China", "china", "asia", 50, 350, "china.png")
-        self.territories["israel"] = Territory("Israel", "israel", "asia", 50, 350, "israel.png")
-        self.territories["india"] = Territory("India", "india", "asia", 50, 350, "india.png")
-        self.territories["siam"] = Territory("Siam", "siam", "asia", 50, 350, "siam.png")
-        self.territories["indonesia"] = Territory("Indonesia", "indonesia", "oceania", 50, 350, "indonesia.png")
-        self.territories["new_guinea"] = Territory("New Guinea", "new_guinea", "oceania", 50, 350, "new_guinea.png")
-        self.territories["western_australia"] = Territory("Western Australia", "western_australia", "oceania", 50, 350, "western_australia.png")
-        self.territories["eastern_australia"] = Territory("Eastern Australia", "eastern_australia", "oceania", 50, 350, "australia.png")
+        self.territories["brazil"] = Territory("Brazil", "brazil", "south_america", 150, 350, "brazil.png")
+        self.territories["argentina"] = Territory("Argentina", "argentina", "south_america", 50, 550, "argentina.png")
+        self.territories["peru"] = Territory("Peru", "peru", "south_america", 50, 450, "peru.png")
 
+        # Europe
+        self.territories["iceland"] = Territory("Iceland", "iceland", "europe", 400, 50, "iceland.png")
+        self.territories["scandinavia"] = Territory("Scandinavia", "scandinavia", "europe", 500, 50, "scandinavia.png")
+        self.territories["great_britain"] = Territory("Great Britain", "great_britain", "europe", 400, 150,
+                                                      "great_britain.png")
+        self.territories["poland"] = Territory("Poland", "poland", "europe", 500, 150, "poland.png")
+        self.territories["greece"] = Territory("Greece", "greece", "europe", 500, 250, "greece.png")
+        self.territories["spain"] = Territory("Spain", "spain", "europe", 400, 250, "spain.png")
+        self.territories["ukraine"] = Territory("Ukraine", "ukraine", "europe", 575, 150, "ukraine.png")
 
+        # Africa
+        self.territories["morocco"] = Territory("Morocco", "morocco", "africa", 350, 350, "morocco.png")
+        self.territories["egypt"] = Territory("Egypt", "egypt", "africa", 450, 350, "egypt.png")
+        self.territories["sudan"] = Territory("Sudan", "sudan", "africa", 450, 450, "sudan.png")
+        self.territories["congo"] = Territory("Congo", "congo", "africa", 350, 450, "congo.png")
+        self.territories["south_africa"] = Territory("South Africa", "south_africa", "africa", 350, 550,
+                                                     "south_africa.png")
+        self.territories["madagascar"] = Territory("Madagascar", "madagascar", "africa", 450, 550, "madagascar.png")
 
+        # Asia
+        self.territories["siberia"] = Territory("Siberia", "siberia", "asia", 750, 50, "siberia.png")
+        self.territories["yakutsk"] = Territory("Yakutsk", "yakutsk", "asia", 850, 50, "yakutsk.png")
+        self.territories["kamchatka"] = Territory("Kamchatka", "kamchatka", "asia", 950, 50, "kamchatka.png")
+        self.territories["ural"] = Territory("Ural", "ural", "asia", 650, 50, "ural.png")
+        self.territories["irkutsk"] = Territory("Irkutsk", "irkutsk", "asia", 750, 150, "irkutsk.png")
+        self.territories["mongolia"] = Territory("Mongolia", "mongolia", "asia", 850, 150, "mongolia.png")
+        self.territories["japan"] = Territory("Japan", "japan", "asia", 950, 150, "japan.png")
+        self.territories["afghanistan"] = Territory("Afghanistan", "afghanistan", "asia", 650, 150, "afghanistan.png")
+        self.territories["china"] = Territory("China", "china", "asia", 850, 250, "china.png")
+        self.territories["israel"] = Territory("Israel", "israel", "asia", 650, 250, "israel.png")
+        self.territories["india"] = Territory("India", "india", "asia", 750, 250, "india.png")
+        self.territories["siam"] = Territory("Siam", "siam", "asia", 950, 250, "siam.png")
+
+        # Oceania
+        self.territories["indonesia"] = Territory("Indonesia", "indonesia", "oceania", 750, 350, "indonesia.png")
+        self.territories["new_guinea"] = Territory("New Guinea", "new_guinea", "oceania", 850, 350, "new_guinea.png")
+        self.territories["western_australia"] = Territory("Western Australia", "western_australia", "oceania", 750, 450,
+                                                          "western_australia.png")
+        self.territories["eastern_australia"] = Territory("Eastern Australia", "eastern_australia", "oceania", 850, 450,
+                                                          "australia.png")
 
         # self.territories["qatar"] = Territory("Qatar", "qatar", 50, 100, "qatar.png")
         # self.territories["egypt"] = Territory("Egypt", "egypt", 100, 500, "egypt.png")
