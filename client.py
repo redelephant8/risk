@@ -38,11 +38,10 @@ class RiskClient:
         self.prev_player_list = []
         self.prev_game_state = "None"
         self.is_host = False  # Variable to track whether the player is the host
-        self.board = Board()
+        self.board = Board(True)
         self.territory_information = {}
         self.current_player = None
         self.prev_player = None
-        self.my_turn = False
         self.territory_selected = False
         self.player_message = None
         self.edited = False
@@ -524,7 +523,7 @@ class RiskClient:
 
 
 if __name__ == "__main__":
-    HOST = "192.168.86.148"  # Change this to your server's IP address
+    HOST = "192.168.86.21"  # Change this to your server's IP address
     PORT = 8080  # Choose the same port as the server
     # player_name = input("Enter your player name: ")
     client = RiskClient(HOST, PORT)
