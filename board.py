@@ -4,10 +4,15 @@ from territory import Territory
 
 
 class Board:
-    def __init__(self):
+    def __init__(self, demo):
+        self.demo = demo
         self.territories = {}
-        self.initialize_territories()
-        self.setup_neighbors()
+        if demo:
+            self.initialize_territories_demo()
+            self.setup_neighbors_demo()
+        else:
+            self.initialize_territories()
+            self.setup_neighbors()
 
     def initialize_territories(self):
         # North America
@@ -118,6 +123,34 @@ class Board:
         self.territories["new_guinea"].neighbors = [self.territories["indonesia"], self.territories["western_australia"], self.territories["eastern_australia"]]
         self.territories["western_australia"].neighbors = [self.territories["indonesia"], self.territories["new_guinea"], self.territories["eastern_australia"]]
         self.territories["eastern_australia"].neighbors = [self.territories["new_guinea"], self.territories["western_australia"]]
+
+    def initialize_territories_demo(self):
+        # Asia
+        self.territories["siberia"] = Territory("Siberia", "siberia", "asia", 400, 100, "siberia.png")
+        self.territories["yakutsk"] = Territory("Yakutsk", "yakutsk", "asia", 600, 100, "yakutsk.png")
+        self.territories["kamchatka"] = Territory("Kamchatka", "kamchatka", "asia", 800, 100, "kamchatka.png")
+        self.territories["ural"] = Territory("Ural", "ural", "asia", 200, 100, "ural.png")
+        self.territories["irkutsk"] = Territory("Irkutsk", "irkutsk", "asia", 400, 300, "irkutsk.png")
+        self.territories["mongolia"] = Territory("Mongolia", "mongolia", "asia", 600, 300, "mongolia.png")
+        self.territories["japan"] = Territory("Japan", "japan", "asia", 800, 300, "japan.png")
+        self.territories["afghanistan"] = Territory("Afghanistan", "afghanistan", "asia", 200, 300, "afghanistan.png")
+        self.territories["china"] = Territory("China", "china", "asia", 600, 500, "china.png")
+        self.territories["israel"] = Territory("Israel", "israel", "asia", 200, 500, "israel.png")
+        self.territories["india"] = Territory("India", "india", "asia", 400, 500, "india.png")
+        self.territories["siam"] = Territory("Siam", "siam", "asia", 800, 500, "siam.png")
+
+    def setup_neighbors_demo(self):
+        self.territories["siberia"].neighbors = [self.territories["ural"], self.territories["yakutsk"], self.territories["irkutsk"], self.territories["mongolia"], self.territories["china"]]
+        self.territories["yakutsk"].neighbors = [self.territories["siberia"], self.territories["irkutsk"], self.territories["kamchatka"]]
+        self.territories["kamchatka"].neighbors = [self.territories["yakutsk"], self.territories["irkutsk"], self.territories["mongolia"], self.territories["japan"]]
+        self.territories["irkutsk"].neighbors = [self.territories["siberia"], self.territories["yakutsk"], self.territories["kamchatka"], self.territories["mongolia"]]
+        self.territories["mongolia"].neighbors = [self.territories["siberia"], self.territories["irkutsk"], self.territories["kamchatka"], self.territories["japan"], self.territories["china"]]
+        self.territories["japan"].neighbors = [self.territories["kamchatka"], self.territories["mongolia"]]
+        self.territories["afghanistan"].neighbors = [self.territories["ural"], self.territories["china"], self.territories["india"], self.territories["israel"]]
+        self.territories["china"].neighbors = [self.territories["afghanistan"], self.territories["ural"], self.territories["siberia"], self.territories["mongolia"], self.territories["siam"], self.territories["india"]]
+        self.territories["israel"].neighbors = [self.territories["afghanistan"], self.territories["india"]]
+        self.territories["india"].neighbors = [self.territories["afghanistan"], self.territories["china"], self.territories["siam"], self.territories["israel"]]
+        self.territories["siam"].neighbors = [self.territories["india"], self.territories["china"]]
 
 
 
