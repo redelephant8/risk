@@ -13,7 +13,7 @@ class RiskServer:
         self.port = port
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.connections = []  # Store client connections
-        self.board = Board()
+        self.board = Board(True)
         self.player_list = []
         self.player_names = []
         self.game_host = None
@@ -118,6 +118,7 @@ class RiskServer:
                         self.switch_player()
                         self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info,
                                              "current_player": self.current_player.name}))
+                        time.sleep(0.1)
                         if self.territories_remaining > 0:
                             self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "initial_territory_selection"})
                         else:
@@ -125,6 +126,7 @@ class RiskServer:
                             self.players_remaining = self.player_number
                             self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info,
                                              "current_player": self.current_player.name}))
+                            time.sleep(0.1)
                             self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "initial_soldier_addition"})
 
                 if message_type == "selected_initial_soldier_territory":
@@ -613,7 +615,7 @@ class RiskServer:
 
 
 if __name__ == "__main__":
-    HOST = "192.168.86.148"  # Change this to your server's IP address
+    HOST = "192.168.86.21"  # Change this to your server's IP address
     PORT = 8080  # Choose a suitable port
     server = RiskServer(HOST, PORT)
     server.start()
