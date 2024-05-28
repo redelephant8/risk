@@ -1,7 +1,8 @@
 from board import Board
 
+
 class Player:
-    def __init__(self, color, name, connection, soldiers_in_hand=5):
+    def __init__(self, color, name, connection, soldiers_in_hand=10):
         self.name = name
         self.color = color
         self.territoryNumber = 0
