@@ -2,6 +2,8 @@ import socket
 import threading
 import pickle
 import time
+import sqlite3
+import json
 from board import Board
 from player import Player
 import random
@@ -28,11 +30,17 @@ class RiskServer:
         self.fortify = []
         self.cards = ["infantry"]*14 + ["cavalry"]*14 + ["artillery"]*14
         self.card_reinforcements = [4, 6, 8, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60]
+        self.game_code = None
+        self.saved_player_names = []
+        self.saved_game = False
+        self.saved_player_amount = 0
+        self.game_stage = []
 
     def start(self):
         self.server_socket.bind((self.host, self.port))
         self.server_socket.listen()
         random.shuffle(self.cards)
+        initialize_database()
 
         print(f"Server is listening on {self.host}:{self.port}")
 
@@ -47,6 +55,8 @@ class RiskServer:
                     if not self.game_host:
                         self.game_host = client_socket
                         print(f"{client_socket} is the host of the game.")
+                        self.game_code = generate_unique_game_code()
+
                         # Sending message to the host
                         self.send_to_client(client_socket, {"type": "join_message", "message": "You are the host."})
 
@@ -58,14 +68,17 @@ class RiskServer:
                 client_socket.close()
             else:
                 client_socket, client_address = self.server_socket.accept()
-                #HERE ADD TO BLOCK MORE THAN 6 CLIENTS JOINING
                 self.connections.append(client_socket)
+                self.send_to_client(client_socket, {"connections": len(self.connections), "saved_game": self.saved_game})
+                # self.send_to_client(client_socket, len(self.connections))
                 print(f"New connection from {client_socket.getpeername()}")
 
                 if not self.game_host:
                     self.game_host = client_socket
                     print(f"{client_socket} is the host of the game.")
+                    self.game_code = generate_unique_game_code()
                     # Sending message to the host
+                    time.sleep(0.1)
                     self.send_to_client(client_socket, {"type": "join_message", "message": "You are the host."})
 
                 client_thread = threading.Thread(target=self.handle_client, args=(client_socket,))
@@ -90,7 +103,24 @@ class RiskServer:
                     self.player_names.append(message.get('name'))
                     self.player_list.append(Player("None", message.get('name'), client_socket))
                     time.sleep(0.1)
-                    self.broadcast({"type": "player_names", "message": self.player_names})
+                    self.broadcast({"type": "player_names", "message": self.player_names, "code": self.game_code, "game_type": "new", "number": 0})
+
+                if message_type == "game_code":
+                    time.sleep(0.1)
+                    print("WhatUP")
+                    if message.get("code") == self.game_code:
+                        self.send_to_client(client_socket, True)
+                    else:
+                        self.send_to_client(client_socket, False)
+                    # if message.get("code") == self.game_code:
+                    #     self.send_to_client(client_socket, {"type": "code_result", "result": "pass"})
+                    # else:
+                    #     self.send_to_client(client_socket, {"type": "code_result", "result": "fail"})
+
+                # if message_type == "saved_game_code":
+                #     time.sleep(0.1)
+                #     if message.get("code") == self.game_code:
+                #         self.send_to_client()
 
                 if message_type == "start_game":
                     print("Host started game")
@@ -108,6 +138,20 @@ class RiskServer:
                     # current_player_index = self.player_list.index(self.current_player)
                     # current_player_connection = self.connections[current_player_index]
                     self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "initial_territory_selection"})
+
+                if message_type == "start_saved_game":
+                    time.sleep(0.1)
+                    self.create_player_list()
+                    for player in self.player_list:
+                        self.send_to_client(player.connection, {"type": "player_color", "color": player.color})
+                    time.sleep(0.1)
+                    packed_territory_info = self.pack_territory_info()
+                    print(packed_territory_info)
+                    self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info,
+                                     "current_player": self.current_player.name}))
+                    time.sleep(0.1)
+                    self.send_to_client(self.current_player.connection, {"type": "continue_game", "stage": self.game_stage})
+
 
                 if message_type == "selected_initial_territory":
                     time.sleep(0.1)
@@ -136,16 +180,16 @@ class RiskServer:
                         print(packed_territory_info)
                         print(self.players_remaining)
                         self.switch_player()
-                        if self.players_remaining > 0 and self.current_player.isOut is True:
-                            while self.current_player.isOut is True:
+                        if self.players_remaining > 0 and self.current_player.is_out_initial is True:
+                            while self.current_player.is_out_initial is True:
                                 self.switch_player()
                         self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info, "current_player": self.current_player.name}))
                         time.sleep(0.1)
                         if self.players_remaining > 0:
                             self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "initial_soldier_addition"})
                         else:
-                            for player in self.player_list:
-                                player.isOut = False
+                            # for player in self.player_list:
+                            #     player.isOut = False
                             self.current_player = self.player_list[0]
                             self.current_player.soldiers_in_hand = self.current_player.reinforcement_calculator()
                             self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info,
@@ -314,6 +358,69 @@ class RiskServer:
                         self.fortify[0].soldierNumber -= self.fortify[1]
                         self.end_turn()
 
+                if message_type == "save_game":
+                    time.sleep(0.1)
+                    current_stage = message.get("stage")
+                    current_player_name = self.current_player.name
+                    save_name = message.get("save_name")
+                    packed_territory_info = self.pack_territory_info()
+                    packed_player_info = self.package_players()
+                    progress = {"players_remaining": self.players_remaining, "territories_remaining": self.territories_remaining, "cards": self.cards, "card_reinforcements": self.card_reinforcements}
+                    save_game_progress(self.game_code, save_name, packed_player_info, current_stage, current_player_name, packed_territory_info, progress)
+                    self.broadcast({"type": "end_game"})
+
+                if message_type == "get_saves":
+                    time.sleep(0.1)
+                    saves = get_all_game_saves()
+                    self.send_to_client(client_socket, {"type": "saves", "saves": saves})
+
+                if message_type == "selected_save":
+                    time.sleep(0.1)
+                    save_code = message.get("save")
+                    save_file = get_save_file(save_code)
+                    if save_file:
+                        player_list = save_file["player_names"]
+                        self.repack_players(player_list, client_socket)
+                        self.game_code = save_file["game_code"]
+                        self.game_stage = save_file["game_stage"]
+                        progress = save_file["progress"]
+                        self.current_player = self.find_player_by_name(save_file["current_player"])
+                        self.players_remaining = progress["players_remaining"]
+                        self.territories_remaining = progress["territories_remaining"]
+                        self.cards = progress["cards"]
+                        self.saved_player_amount = len(self.saved_player_names)
+                        self.card_reinforcements = progress["card_reinforcements"]
+                        self.saved_game = True
+                        self.send_to_client(client_socket, {"type": "player_options", "player_options": self.saved_player_names})
+
+
+
+
+                        # packed_territory_info = self.pack_territory_info()
+                        # print(packed_territory_info)
+                        # self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info,
+                        #                  "current_player": self.current_player.name}))
+                        # time.sleep(0.1)
+                        # self.send_to_client(self.current_player.connection, {"type": "continue_game", "stage": game_stage})
+
+                if message_type == "selected_player":
+                    time.sleep(0.1)
+                    print("WHATHAHATH")
+                    selected_player_name = message.get("save")
+                    self.player_names.append(selected_player_name)
+                    self.saved_player_names.remove(selected_player_name)
+                    selected_player = self.find_player_by_name(selected_player_name)
+                    selected_player.connection = client_socket
+                    self.broadcast({"type": "player_names", "message": self.player_names, "code": self.game_code, "game_type": "saved", "number": self.saved_player_amount})
+
+                if message_type == "pass_to_select_saved_player":
+                    time.sleep(0.1)
+                    self.send_to_client(client_socket,{"type": "player_options", "player_options": self.saved_player_names})
+
+
+
+
+
 
             except Exception as e:
                 import traceback
@@ -333,7 +440,7 @@ class RiskServer:
                 self.game_host = self.connections[0]
                 self.send_to_client(self.game_host, {"type": "join_message", "message": "You are the host."})
                 time.sleep(0.1)
-        self.broadcast({"type": "player_names", "message": self.player_names})
+        self.broadcast({"type": "player_names", "message": self.player_names, "code": self.game_code, "game_type": "new", "number": 0})
         client_socket.close()
 
     def pack_territory_info(self):
@@ -345,10 +452,60 @@ class RiskServer:
             packed_territory_info[territory_name] = [territory.soldierNumber, color]
         return packed_territory_info
 
+    # def repack_territory_info(self, territories):
+    #     for territory_name, territory_info in territories:
+    #         self.board.territories[territory_name]:
+
+    def repack_players(self, players, connection):
+        for player_name, player_info in players.items():
+            player = Player(player_info["color"], player_name, connection, player_info["soldiers_in_hand"])
+            player.cards = player_info["cards"]
+            player.has_conquered = player_info["has_conquered"]
+            player.isOut = player_info["isOut"]
+            player.is_out_initial = player_info["is_out_initial"]
+            territories = player_info["territory_names"]
+            for territory_info in territories:
+                territory = self.find_territory(territory_info)
+                territory.owner = player
+                player.territories.append(territory)
+            self.player_list.append(player)
+            self.saved_player_names.append(player.name)
+
+    def create_player_list(self):
+        self.player_names = []
+        for player in self.player_list:
+            self.player_names.append(player.name)
+
+    def package_players(self):
+        packed_player_info = {}
+        for player in self.player_list:
+            if player.isOut is False:
+                name = player.name
+                territory_names = self.package_owned_territories(player.territories)
+                packed_player_info[name] = {"color": player.color, "cards": player.cards, "has_conquered": player.has_conquered, "soldiers_in_hand": player.soldiers_in_hand, "isOut": player.isOut, "territory_names": territory_names, "is_out_initial": player.is_out_initial}
+        return packed_player_info
+
+    def package_owned_territories(self, territories):
+        territory_names = []
+        for territory in territories:
+            territory_names.append([territory.lower_name, territory.soldierNumber])
+        return territory_names
+
     def find_player(self, connection):
         for player in self.player_list:
             if player.connection == connection:
                 return player
+
+    def find_player_by_name(self, name):
+        for player in self.player_list:
+            if player.name == name:
+                return player
+
+    def find_territory(self, territory_info):
+        for territory_name, territory in self.board.territories.items():
+            if territory.lower_name == territory_info[0]:
+                territory.soldierNumber = territory_info[1]
+                return territory
 
     def broadcast(self, data, exception=None):
         for connection in self.connections:
@@ -402,7 +559,7 @@ class RiskServer:
             self.current_player.soldiers_in_hand -= 1
             if self.current_player.soldiers_in_hand <= 0:
                 self.players_remaining -= 1
-                self.current_player.isOut = True
+                self.current_player.is_out_initial = True
             return True
         else:
             self.send_to_client(self.current_player.connection, {"type": "reselect_territory", "message": f"{territory.name} is owned by {territory.owner.name}. You can not add soldiers to a territory you don't own"})
@@ -475,6 +632,7 @@ class RiskServer:
         else:
             self.send_to_client(self.current_player.connection,{"type": "reselect_territory", "message": "You must fortify your own territory"})
             return False
+
     def attack(self, attacking_territory, defending_territory):
         print(f"New Battle: {self.current_player} is attacking {defending_territory.name} with {attacking_territory.name}")
         attacker_dice = [random.randint(1, 6) for _ in
@@ -613,9 +771,118 @@ class RiskServer:
             self.current_player.cards["artillery"] -= 1
 
 
+def initialize_database():
+    conn = sqlite3.connect('game_progress.db')
+    cursor = conn.cursor()
+
+    # Create table if it doesn't exist
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS game_progress (
+        game_code TEXT PRIMARY KEY,
+        save_name TEXT,
+        player_names TEXT,
+        game_stage TEXT,
+        current_player TEXT,
+        territories TEXT
+        progress TEXT
+    )
+    ''')
+
+    # Check if save_name column exists, if not, add it
+    cursor.execute("PRAGMA table_info(game_progress);")
+    columns = [column[1] for column in cursor.fetchall()]
+    if 'save_name' not in columns:
+        cursor.execute("ALTER TABLE game_progress ADD COLUMN save_name TEXT;")
+    if 'progress' not in columns:
+        cursor.execute("ALTER TABLE game_progress ADD COLUMN progress TEXT;")
+
+    conn.commit()
+    conn.close()
+
+
+def save_game_progress(game_code, save_name, player_names, game_stage, current_player, territories, progress):
+    conn = sqlite3.connect('game_progress.db')
+    cursor = conn.cursor()
+    player_names_str = json.dumps(player_names)
+    territories_str = json.dumps(territories)
+    game_stage_str = json.dumps(game_stage)
+    progress_str = json.dumps(progress)
+
+    cursor.execute('''
+    INSERT INTO game_progress (game_code, save_name, player_names, game_stage, current_player, territories, progress)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    ''', (game_code, save_name, player_names_str, game_stage_str, current_player, territories_str, progress_str))
+    conn.commit()
+    conn.close()
+    print(f"Game progress saved locally with game code: {game_code}")
+
+
+def get_all_game_saves():
+    conn = sqlite3.connect('game_progress.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT game_code, save_name FROM game_progress')
+    saves = cursor.fetchall()
+    conn.close()
+    return saves
+
+
+def get_save_file(save_code):
+    # Connect to the SQLite database
+    conn = sqlite3.connect('game_progress.db')
+    cursor = conn.cursor()
+
+    # Query the database for the game save with the specified save code
+    cursor.execute(
+        'SELECT save_name, player_names, game_stage, current_player, territories, progress FROM game_progress WHERE game_code = ?',
+        (save_code,))
+    save = cursor.fetchone()
+
+    if save:
+        save_name, player_names_str, game_stage_str, current_player, territories_str, progress_str = save
+        # Convert JSON strings back to Python lists
+        player_names = json.loads(player_names_str)
+        territories = json.loads(territories_str)
+        game_stage = json.loads(game_stage_str)
+        progress = json.loads(progress_str)
+
+        # Delete the save from the database
+
+        #temporary commented!!!!!!
+        # cursor.execute('DELETE FROM game_progress WHERE game_code = ?', (save_code,))
+        # conn.commit()
+
+        # Close the database connection
+        conn.close()
+
+        return {
+            'game_code': save_code,
+            'save_name': save_name,
+            'player_names': player_names,
+            'game_stage': game_stage,
+            'current_player': current_player,
+            'territories': territories,
+            'progress': progress
+        }
+    else:
+        conn.close()
+        print(f"No save found with game code: {save_code}")
+        return None
+
+
+def generate_unique_game_code():
+    conn = sqlite3.connect('game_progress.db')
+    cursor = conn.cursor()
+    while True:
+        game_code = ''.join(random.choices('0123456789', k=5))
+        cursor.execute('SELECT game_code FROM game_progress WHERE game_code = ?', (game_code,))
+        if cursor.fetchone() is None:
+            conn.commit()
+            conn.close()
+            return game_code
+
 
 if __name__ == "__main__":
-    HOST = "192.168.86.21"  # Change this to your server's IP address
+    HOST = "192.168.86.248"  # Change this to your server's IP address
     PORT = 8080  # Choose a suitable port
     server = RiskServer(HOST, PORT)
     server.start()
