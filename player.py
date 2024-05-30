@@ -11,6 +11,7 @@ class Player:
         self.has_conquered = False
         self.soldiers_in_hand = soldiers_in_hand
         self.isOut = False
+        self.is_out_initial = False
         self.connection = connection
         self.available_neighbors_list = []
 
