@@ -140,6 +140,7 @@ class Board:
         self.territories["siam"] = Territory("Siam", "siam", "asia", 800, 500, "siam.png")
 
     def setup_neighbors_demo(self):
+        self.territories["ural"].neighbors = [self.territories["siberia"], self.territories["afghanistan"], self.territories["china"]]
         self.territories["siberia"].neighbors = [self.territories["ural"], self.territories["yakutsk"], self.territories["irkutsk"], self.territories["mongolia"], self.territories["china"]]
         self.territories["yakutsk"].neighbors = [self.territories["siberia"], self.territories["irkutsk"], self.territories["kamchatka"]]
         self.territories["kamchatka"].neighbors = [self.territories["yakutsk"], self.territories["irkutsk"], self.territories["mongolia"], self.territories["japan"]]
