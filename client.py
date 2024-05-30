@@ -7,23 +7,17 @@ from pygame.locals import *
 import threading
 from board import Board
 
-width, height = 1000, 600
-DICE_SIZE = 10
-DICE_OFFSET_X = 50
-DICE_OFFSET_Y = 50
-DICE_IMAGES = {
-    1: pygame.image.load("dice_white_1.png"),
-    2: pygame.image.load("dice_white_2.png"),
-    3: pygame.image.load("dice_white_3.png"),
-    4: pygame.image.load("dice_white_4.png"),
-    5: pygame.image.load("dice_white_5.png"),
-    6: pygame.image.load("dice_white_6.png"),
-}
 def draw_text(text, font, color, surface, x, y):
     text_obj = font.render(text, True, color)
     text_rect = text_obj.get_rect()
     text_rect.topleft = (x, y)
     surface.blit(text_obj, text_rect)
+
+
+width, height = 1000, 600
+screen = pygame.display.set_mode((width, height))
+pygame.display.set_caption("Risk")
+clock = pygame.time.Clock()
 
 class RiskClient:
     def __init__(self, host, port):
@@ -48,17 +42,38 @@ class RiskClient:
         self.number = []
         self.attacker_dice = None
         self.defender_dice = None
+        self.game_code = None
+        self.code_result = False
+        self.saved_game = False
+        self.save_game_count = 0
+        self.saves = None
+        self.player_options = None
 
     def start(self):
-        width, height = 1000, 600
-        screen = pygame.display.set_mode((width, height))
-        pygame.display.set_caption("Risk")
-        clock = pygame.time.Clock()  # Create a clock object for controlling FPS
-
         self.client_socket.connect((self.host, self.port))
         print(f"Connected to server {self.host}:{self.port}")
 
-        self.get_player_name(screen)
+        data = self.client_socket.recv(1024)
+        message = pickle.loads(data)
+        connection_num = message.get("connections")
+        if message.get("saved_game") is True:
+            self.saved_game = True
+
+        # self.demo_option(screen)
+
+        if connection_num == 1:
+            self.game_options(screen, False)
+        else:
+            self.game_options(screen, True)
+            while self.code_result == False:
+                data = self.client_socket.recv(1024)
+                self.code_result = pickle.loads(data)
+                if self.code_result is False:
+                    self.get_player_input(screen, "code", True)
+            if self.saved_game:
+                self.client_socket.sendall(pickle.dumps({"type": "pass_to_select_saved_player"}))
+            else:
+                self.get_player_input(screen, "name", False)
 
         # Start a separate thread for receiving data from the server
         receive_thread = threading.Thread(target=self.receive_data)
@@ -66,15 +81,19 @@ class RiskClient:
         receive_thread.start()
 
         while True:
-            for event in pygame.event.get():  # Event handling loop
+            for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     return
                 if event.type == pygame.MOUSEBUTTONDOWN:
-                    if self.is_host and len(self.player_list) >= 2:
-                        # Check if the mouse click is within the "Start Game" button
-                        start_button_rect = pygame.Rect(250, 100 + len(self.player_list) * 40, 200, 50)
-                        if start_button_rect.collidepoint(event.pos):
-                            self.start_game()
+                    if self.is_host:
+                        if (self.saved_game and len(self.player_list) == self.save_game_count) or (self.saved_game is False and len(self.player_list) >= 2):
+                            # Check if the mouse click is within the "Start Game" button
+                            start_button_rect = pygame.Rect(250, 100 + len(self.player_list) * 40, 200, 50)
+                            if start_button_rect.collidepoint(event.pos):
+                                if self.saved_game:
+                                    self.start_saved_game()
+                                else:
+                                    self.start_game()
 
             # Render the lobby screen
             if self.game_state == "lobby" and self.prev_player_list is not self.player_list:
@@ -154,6 +173,15 @@ class RiskClient:
                         self.edit_screen(screen, f"It's {self.current_player}'s turn")
                     self.prev_game_state = self.game_state
 
+                if self.game_state == "end_game":
+                    self.end_game(screen)
+
+                if self.game_state == "pick_saves":
+                    self.present_saves(screen, self.saves, "saves")
+
+                if self.game_state == "pick_save_player_options":
+                    self.present_saves(screen, self.player_options, "players")
+
             # if self.prev_player != self.current_player and self.game_state == "print_board":
             #     self.edit_screen(screen, f"It's {self.current_player}'s turn")
             #     self.prev_player = self.current_player
@@ -186,8 +214,19 @@ class RiskClient:
                         self.is_host = True  # Set the player as the host
                         print("IJIOJDSOIFJSD, it worked")
 
+                # if message_type == "code_result":
+                #     if message.get("result") == "pass":
+                #         self.
+
                 if message_type == "player_names":
                     self.player_list = message.get("message")
+                    self.game_code = message.get("code")
+                    self.game_state = "lobby"
+                    game_type = message.get("game_type")
+                    if message.get("number") != 0:
+                        self.save_game_count = message.get("number")
+                    if game_type == "saved":
+                        self.saved_game = True
                     # self.player_color = message.get("color")
                     print(message)
                     print(self.player_list)
@@ -219,6 +258,25 @@ class RiskClient:
                     self.current_player = message.get("current_player")
                     self.update_local_board()
                     self.game_state = "print_board"
+
+                if message_type == "end_game":
+                    self.game_state = "end_game"
+
+                if message_type == "saves":
+                    self.saves = message.get("saves")
+                    self.game_state = "pick_saves"
+                    # self.present_saves(screen, saves, "saves")
+
+                if message_type == "player_options":
+                    self.player_options = message.get("player_options")
+                    self.game_state = "pick_save_player_options"
+                    # self.present_saves(player_options, "players")
+
+                if message_type == "continue_game":
+                    states = message.get("stage")
+                    self.game_stage = states[0]
+                    self.game_state = states[1]
+                    self.player_message = states[2]
 
                 # if message_type == "current_player":
                 #     self.my_turn = False
@@ -304,13 +362,73 @@ class RiskClient:
                         if territory.click(mouse_pos):
                             selected_territory = territory
                             selection_valid = True
+                        save_btn = pygame.Rect(800, 500, 150, 50)
+                        if self.is_host and save_btn.collidepoint(mouse_pos):
+                            self.get_player_input(screen, "save_name", False)
+                            #
+                            # message = {"type": "save_game", "stage": [self.game_stage, self.game_state]}
+                            # self.client_socket.sendall(pickle.dumps(message))
+                            return None
                         if self.game_stage == "attacking_territory" or self.game_stage == "defending_territory":
                             button_rect = pygame.Rect(600, 500, 150, 50)
                             if button_rect.collidepoint(mouse_pos):
                                 selected_territory = None
                                 selection_valid = True
         return selected_territory
-    def get_player_name(self, screen):
+
+    def game_options(self, screen, has_host):
+        pygame.font.init()
+        if has_host:
+            join_game_button = pygame.Rect(400, 350, 200, 40)
+        else:
+            new_game_button = pygame.Rect(400, 350, 200, 40)
+            load_game_button = pygame.Rect(400, 450, 220, 40)
+        text = ''
+        font = pygame.font.Font(None, 32)
+        running = True
+        while running:
+            for event in pygame.event.get():
+                if event.type == QUIT:
+                    pygame.quit()
+                if event.type == MOUSEBUTTONDOWN:
+                    if has_host:
+                        if join_game_button.collidepoint(event.pos):
+                            self.get_player_input(screen, "code", False)
+                            return
+                    else:
+                        if new_game_button.collidepoint(event.pos):
+                            self.get_player_input(screen, "name", False)
+                            return
+                        if load_game_button.collidepoint(event.pos):
+                            message = {"type": "get_saves"}
+                            self.client_socket.sendall(pickle.dumps(message))
+                            return
+            screen.fill((194, 236, 237))
+            # Render the welcome message.
+            draw_text("Welcome, would you like to start a new game or load an existing game?", font, (0, 0, 0), screen, 100, 250)
+            # Render the current text.
+            color = pygame.Color('green')
+            # txt_surface = font.render(text, True, color)
+
+            # Render the submit button
+            if has_host:
+                pygame.draw.rect(screen, color, join_game_button)
+                text = font.render("Join Game", True, (255, 255, 255))
+                text_rect = text.get_rect(center=join_game_button.center)
+                screen.blit(text, text_rect)
+            else:
+                pygame.draw.rect(screen, color, new_game_button)
+                pygame.draw.rect(screen, color, load_game_button)
+                text = font.render("New Game", True, (255, 255, 255))
+                text_rect = text.get_rect(center=new_game_button.center)
+                screen.blit(text, text_rect)
+
+                text = font.render("Load Local Game", True, (255, 255, 255))
+                text_rect = text.get_rect(center=load_game_button.center)
+                screen.blit(text, text_rect)
+            pygame.display.flip()
+
+    def get_player_input(self, screen, input_type, retry):
         pygame.font.init()  # Initialize Pygame font system
         input_box = pygame.Rect(300, 300, 200, 40)
         submit_button = pygame.Rect(350, 350, 100, 40)  # Submit button rectangle
@@ -337,8 +455,18 @@ class RiskClient:
                     # If the user clicked on the submit button
                     if submit_button.collidepoint(event.pos):
                         # Send the entered name to the server
-                        self.player_name = text
-                        message = {"type": "name_selection", "name": self.player_name}
+                        message = ""
+                        if input_type == "name":
+                            self.player_name = text
+                            message = {"type": "name_selection", "name": self.player_name}
+                        elif input_type == "code":
+                            message = {"type": "game_code", "code": text}
+                            # if self.saved_game:
+                            #     message = {"type": "saved_game_code", "code": text}
+                            # else:
+                            #     message = {"type": "game_code", "code": text}
+                        elif input_type == "save_name":
+                            message = {"type": "save_game", "save_name": text, "stage": [self.game_stage, self.game_state, self.player_message]}
                         self.client_socket.sendall(pickle.dumps(message))
                         return
                     # Change the current color of the input box.
@@ -347,8 +475,18 @@ class RiskClient:
                     if active:
                         if event.key == K_RETURN:
                             # Send the entered name to the server
-                            self.player_name = text
-                            message = {"type": "name_selection", "name": self.player_name}
+                            message = ""
+                            if input_type == "name":
+                                self.player_name = text
+                                message = {"type": "name_selection", "name": self.player_name}
+                            elif input_type == "code":
+                                message = {"type": "game_code", "code": text}
+                                # if self.saved_game:
+                                #     message = {"type": "saved_game_code", "code": text}
+                                # else:
+                                #     message = {"type": "game_code", "code": text}
+                            elif input_type == "save_name":
+                                message = {"type": "save_game", "save_name": text, "stage": [self.game_stage, self.game_state, self.player_message]}
                             self.client_socket.sendall(pickle.dumps(message))
                             return
                         elif event.key == K_BACKSPACE:
@@ -356,9 +494,17 @@ class RiskClient:
                         else:
                             text += event.unicode
 
-            screen.fill((194, 236, 237))  # White background
+            screen.fill((194, 236, 237))
             # Render the welcome message.
-            draw_text("Welcome!", font, (0, 0, 0), screen, 300, 250)
+            if input_type == "name":
+                draw_text("Welcome, please enter your name!", font, (0, 0, 0), screen, 300, 250)
+            elif input_type == "code":
+                if retry:
+                    draw_text("Incorrect game code, please enter again.", font, (0, 0, 0), screen, 300, 250)
+                else:
+                    draw_text("Welcome, please enter the game code!", font, (0, 0, 0), screen, 300, 250)
+            elif input_type == "save_name":
+                draw_text("Please enter a name for your local save:", font, (0, 0, 0), screen, 300, 250)
             # Render the current text.
             txt_surface = font.render(text, True, color)
             # Resize the box if the text is too long.
@@ -381,12 +527,15 @@ class RiskClient:
 
         screen.fill((194, 236, 237))  # Fill the screen with white color
 
+        if self.game_code is not None:
+            draw_text(f"Room Code: {self.game_code}", font, (0, 0, 0), screen, 300, 20)
+
         # Display title
-        draw_text("Players in the Lobby:", font, (0, 0, 0), screen, 300, 50)
+        draw_text("Players in the Lobby:", font, (0, 0, 0), screen, 300, 75)
 
         # Display player names
         for i, player_name in enumerate(self.player_list):
-            draw_text(player_name, font, (0, 0, 0), screen, 300, 100 + i * 40)
+            draw_text(player_name, font, (0, 0, 0), screen, 300, 125 + i * 40)
 
         # Check if the client is the host and there are at least three clients including the host
         if self.is_host and len(self.player_list) >= 2:
@@ -395,11 +544,31 @@ class RiskClient:
             pygame.draw.rect(screen, (0, 255, 0), start_button)
             draw_text("Start Game", font, (0, 0, 0), screen, start_button.x + 50, start_button.y + 15)
 
+    # def load_game_saves(self):
+    #
+
     def start_game(self):
         # Send a message to the server indicating that the game should start
         message = {"type": "start_game"}
         self.client_socket.sendall(pickle.dumps(message))
         print("Start game message sent to server")
+
+        # save_thread = threading.Thread(target=self.wait_for_save_game)
+        # save_thread.daemon = True
+        # save_thread.start()
+
+    def start_saved_game(self):
+        message = {"type": "start_saved_game"}
+        self.client_socket.sendall(pickle.dumps(message))
+
+
+
+    def end_game(self, screen):
+        screen.fill((194, 236, 237))  # Fill the screen with white color
+        font = pygame.font.Font(None, 36)  # Font for rendering text
+        draw_text("The game has been ended by host", font, (0, 0, 0), screen, 300, 50)
+        pygame.display.flip()
+        pygame.time.Clock().tick(30)
 
     def update_local_board(self):
         # for territory_name, territory in self.board.territories.items
@@ -408,6 +577,61 @@ class RiskClient:
 
             #THIS ALSO NEEDS TO BE FIXED
             self.board.territories[territory_name].owner = territory_name
+
+    def present_saves(self, screen, saves, save_type):
+
+        font = pygame.font.Font(None, 36)
+        small_font = pygame.font.Font(None, 24)
+
+        save_buttons = []
+
+        if save_type == "saves":
+            for idx, (game_code, save_name) in enumerate(saves):
+                rect = pygame.Rect(100, 100 + 75 * idx, 100, 100)
+                save_buttons.append((rect, (game_code, save_name)))
+        elif save_type == "players":
+            for idx, player_name in enumerate(saves):
+                text = font.render(f"{idx + 1}. {player_name}", True, (255, 255, 255))
+                rect = text.get_rect(topleft=(20, 50 + idx * 40))
+                save_buttons.append((rect, player_name))
+
+        running = True
+        while running:
+            for event in pygame.event.get():
+                if event.type == QUIT:
+                    pygame.quit()
+                if event.type == MOUSEBUTTONDOWN:
+                    print("whwhwhwh")
+                    for button, save in save_buttons:
+                        if button.collidepoint(event.pos):
+                            message = ""
+                            print("oisjdofisjdofi")
+                            if save_type == "saves":
+                                message = {"type": "selected_save", "save": save[0]}
+                            elif save_type == "players":
+                                message = {"type": "selected_player", "save": save}
+                            self.client_socket.sendall(pickle.dumps(message))
+                            return
+
+            screen.fill((194, 236, 237))
+
+            for rect, _ in save_buttons:
+                pygame.draw.rect(screen, (100, 100, 100), rect)
+
+            if save_type == "saves":
+                for rect, (game_code, save_name) in save_buttons:
+                    text = font.render(f"{save_name} (Code: {game_code})", True, (255, 255, 255))
+                    text_rect = text.get_rect(center=rect.center)
+                    screen.blit(text, text_rect)
+            elif save_type == "players":
+                for rect, player_name in save_buttons:
+                    text = font.render(f"{player_name}", True, (255, 255, 255))
+                    text_rect = text.get_rect(center=rect.center)
+                    screen.blit(text, text_rect)
+
+            pygame.display.flip()
+
+        pygame.quit()
 
     def edit_screen(self, screen, message=None):
         # Clear the screen
@@ -426,6 +650,15 @@ class RiskClient:
             text = font.render("End Combat Phase", True, (255, 255, 255))
             text_rect = text.get_rect(center=button_rect.center)
             screen.blit(text, text_rect)
+
+        if self.is_host:
+            save_btn = pygame.Rect(850, 550, 150, 50)
+            pygame.draw.rect(screen, (0, 0, 255), save_btn)
+            font = pygame.font.SysFont(None, 30)
+            text = font.render("Save Game", True, (255, 255, 255))
+            text_rect = text.get_rect(center=save_btn.center)
+            screen.blit(text, text_rect)
+
 
         if message:
             font = pygame.font.SysFont(None, 30)
@@ -488,18 +721,6 @@ class RiskClient:
             text_rect = text_surface.get_rect(center=button_rect.center)
             screen.blit(text_surface, text_rect)
 
-        # # Draw dice results
-        # if dice_results:
-        #     dice_text = "Dice Results:"
-        #     dice_text_surface = font.render(dice_text, True, (0, 0, 0))
-        #     dice_text_rect = dice_text_surface.get_rect(center=(popup_x + popup_width // 2, popup_y + 150))
-        #     screen.blit(dice_text_surface, dice_text_rect)
-        #
-        #     dice_x = popup_x + (popup_width - DICE_SIZE * len(dice_results)) // 2
-        #     dice_y = popup_y + popup_height - 120
-        #     for i, result in enumerate(dice_results):
-        #         self.draw_dice(screen, result, dice_x + i * (DICE_SIZE + 10), dice_y)
-
         pygame.display.flip()
 
         # Return the index of the selected option
@@ -517,13 +738,19 @@ class RiskClient:
                         if button_rect.collidepoint(mouse_pos):
                             return i
 
-    def draw_dice(self, screen, value, x, y):
-        screen.blit(DICE_IMAGES[value], (x, y))
-        pygame.display.flip()
+    # def wait_for_save_game(self):
+    #     while True:
+    #         for event in pygame.event.get():
+    #             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+    #                 mouse_pos = pygame.mouse.get_pos()
+    #                 save_btn = pygame.Rect(800, 500, 150, 50)
+    #                 if save_btn.collidepoint(mouse_pos):
+    #                     message = {"type": "save_game", "stage": self.game_stage}
+    #                     self.client_socket.sendall(pickle.dumps(message))
 
 
 if __name__ == "__main__":
-    HOST = "192.168.86.21"  # Change this to your server's IP address
+    HOST = "192.168.86.248"  # Change this to your server's IP address
     PORT = 8080  # Choose the same port as the server
     # player_name = input("Enter your player name: ")
     client = RiskClient(HOST, PORT)
