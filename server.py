@@ -94,20 +94,15 @@ class RiskServer:
                 # Process received data
                 message = pickle.loads(data)
                 message_type = message.get("type")
-
-                # if message_type == "territory_selection":
-                #     self.handle_territory_selection(message)
+                time.sleep(0.1)
 
                 if message_type == "name_selection":
                     print(f"Connected player name: {message.get('name')}")
                     self.player_names.append(message.get('name'))
                     self.player_list.append(Player("None", message.get('name'), client_socket))
-                    time.sleep(0.1)
                     self.broadcast({"type": "player_names", "message": self.player_names, "code": self.game_code, "game_type": "new", "number": 0})
 
                 if message_type == "game_code":
-                    time.sleep(0.1)
-                    print("WhatUP")
                     if message.get("code") == self.game_code:
                         self.send_to_client(client_socket, True)
                     else:
@@ -124,7 +119,6 @@ class RiskServer:
 
                 if message_type == "start_game":
                     print("Host started game")
-                    time.sleep(0.1)
                     for player in self.player_list:
                         player.color = colors[0]
                         colors.pop(0)
@@ -135,12 +129,9 @@ class RiskServer:
                     self.switch_player()
                     self.broadcast(({"type": "start_game", "territory_info": packed_territory_info, "current_player": self.current_player.name}))
                     time.sleep(0.1)
-                    # current_player_index = self.player_list.index(self.current_player)
-                    # current_player_connection = self.connections[current_player_index]
                     self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "initial_territory_selection"})
 
                 if message_type == "start_saved_game":
-                    time.sleep(0.1)
                     self.create_player_list()
                     for player in self.player_list:
                         self.send_to_client(player.connection, {"type": "player_color", "color": player.color})
@@ -154,7 +145,6 @@ class RiskServer:
 
 
                 if message_type == "selected_initial_territory":
-                    time.sleep(0.1)
                     selected_initial_territory = self.board.territories[message.get("territory")]
                     if self.check_selected_initial_territory(selected_initial_territory):
                         packed_territory_info = self.pack_territory_info()
@@ -216,7 +206,6 @@ class RiskServer:
                         self.send_to_client(self.current_player.connection,{"type": "turn_message", "turn_type": "receiving_reinforcements", "number": self.current_player.soldiers_in_hand, "first_time": "True"})
 
                 if message_type == "selected_reinforcement_territory":
-                    time.sleep(0.1)
                     selected_territory = self.board.territories[message.get("territory")]
                     if self.check_reinforcement_territory(selected_territory):
                         packed_territory_info = self.pack_territory_info()
@@ -227,7 +216,6 @@ class RiskServer:
                             self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "select_attacking_territory"})
 
                 if message_type == "selected_attacking_territory":
-                    time.sleep(0.1)
                     if message.get("territory") == "end_combat":
                         if self.check_if_can_fortify():
                             packed_territory_info = self.pack_territory_info()
@@ -247,12 +235,10 @@ class RiskServer:
                             self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "select_attacking_soldiers", "number": number})
 
                 if message_type == "selected_attacking_soldiers":
-                    time.sleep(0.1)
                     self.current_attack_number = message.get("number")
                     self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "select_defending_territory"})
 
                 if message_type == "selected_defending_territory":
-                    time.sleep(0.1)
                     if message.get("territory") == "end_combat":
                         if self.check_if_can_fortify():
                             packed_territory_info = self.pack_territory_info()
@@ -271,14 +257,12 @@ class RiskServer:
                             self.attack(self.current_attacking_territory, selected_territory)
 
                 if message_type == "selected_transferring_soldiers":
-                    time.sleep(0.1)
                     num_transferring_soldiers = message.get("number")
                     self.current_defending_territory.soldierNumber = num_transferring_soldiers
                     self.current_attacking_territory.soldierNumber -= num_transferring_soldiers
                     self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "attack_results", "attacker_dice": self.dice[0], "defender_dice": self.dice[1], "defender": self.dice[2]})
 
                 if message_type == "selected_attack_option":
-                    time.sleep(0.1)
                     if self.check_win():
                         packed_territory_info = self.pack_territory_info()
                         self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info,
@@ -304,7 +288,6 @@ class RiskServer:
                                                 {"type": "turn_message", "turn_type": "select_attacking_territory"})
 
                 if message_type == "selected_if_fortify":
-                    time.sleep(0.1)
                     result_index = message.get("number")
                     if result_index == 1:
                         if self.current_player.has_conquered:
@@ -319,7 +302,6 @@ class RiskServer:
                     print(packed_territory_info)
                     self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info,
                                      "current_player": self.current_player.name}))
-                    time.sleep(0.1)
                     self.current_player.has_conquered = False
                     self.current_player.soldiers_in_hand = self.current_player.reinforcement_calculator()
                     if result_index == 1:
@@ -337,7 +319,6 @@ class RiskServer:
                                             {"type": "turn_message", "turn_type": "select_fortify_territory"})
 
                 if message_type == "selected_fortify_territory_home":
-                    time.sleep(0.1)
                     selected_territory = self.board.territories[message.get("territory")]
                     if self.check_selected_fortify_territory_home(selected_territory):
                         self.fortify.append(selected_territory)
@@ -345,13 +326,11 @@ class RiskServer:
                         self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "select_fortify_territory_soldier_number", "transfer_options": transfer_options})
 
                 if message_type == "selected_fortify_soldiers":
-                    time.sleep(0.1)
                     num_transferring_soldiers = message.get("number")
                     self.fortify.append(num_transferring_soldiers)
                     self.send_to_client(self.current_player.connection,{"type": "turn_message", "turn_type": "select_fortify_territory_new_home"})
 
                 if message_type == "selected_fortify_territory_new_home":
-                    time.sleep(0.1)
                     selected_territory = self.board.territories[message.get("territory")]
                     if self.check_selected_fortify_territory_new_home(selected_territory, self.fortify[0]):
                         selected_territory.soldierNumber += self.fortify[1]
@@ -359,7 +338,6 @@ class RiskServer:
                         self.end_turn()
 
                 if message_type == "save_game":
-                    time.sleep(0.1)
                     current_stage = message.get("stage")
                     current_player_name = self.current_player.name
                     save_name = message.get("save_name")
@@ -370,12 +348,10 @@ class RiskServer:
                     self.broadcast({"type": "end_game"})
 
                 if message_type == "get_saves":
-                    time.sleep(0.1)
                     saves = get_all_game_saves()
                     self.send_to_client(client_socket, {"type": "saves", "saves": saves})
 
                 if message_type == "selected_save":
-                    time.sleep(0.1)
                     save_code = message.get("save")
                     save_file = get_save_file(save_code)
                     if save_file:
@@ -393,19 +369,7 @@ class RiskServer:
                         self.saved_game = True
                         self.send_to_client(client_socket, {"type": "player_options", "player_options": self.saved_player_names})
 
-
-
-
-                        # packed_territory_info = self.pack_territory_info()
-                        # print(packed_territory_info)
-                        # self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info,
-                        #                  "current_player": self.current_player.name}))
-                        # time.sleep(0.1)
-                        # self.send_to_client(self.current_player.connection, {"type": "continue_game", "stage": game_stage})
-
                 if message_type == "selected_player":
-                    time.sleep(0.1)
-                    print("WHATHAHATH")
                     selected_player_name = message.get("save")
                     self.player_names.append(selected_player_name)
                     self.saved_player_names.remove(selected_player_name)
@@ -414,13 +378,7 @@ class RiskServer:
                     self.broadcast({"type": "player_names", "message": self.player_names, "code": self.game_code, "game_type": "saved", "number": self.saved_player_amount})
 
                 if message_type == "pass_to_select_saved_player":
-                    time.sleep(0.1)
                     self.send_to_client(client_socket,{"type": "player_options", "player_options": self.saved_player_names})
-
-
-
-
-
 
             except Exception as e:
                 import traceback
@@ -451,10 +409,6 @@ class RiskServer:
                 color = territory.owner.color
             packed_territory_info[territory_name] = [territory.soldierNumber, color]
         return packed_territory_info
-
-    # def repack_territory_info(self, territories):
-    #     for territory_name, territory_info in territories:
-    #         self.board.territories[territory_name]:
 
     def repack_players(self, players, connection):
         for player_name, player_info in players.items():
