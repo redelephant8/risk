@@ -19,6 +19,7 @@ class RiskServer:
         self.player_list = []
         self.player_names = []
         self.game_host = None
+        self.game_started = False
         self.current_player = None
         self.player_number = 0
         self.players_remaining = 0
@@ -35,6 +36,7 @@ class RiskServer:
         self.saved_game = False
         self.saved_player_amount = 0
         self.game_stage = []
+        self.removed_player_details = None
 
     def start(self):
         self.server_socket.bind((self.host, self.port))
@@ -107,18 +109,10 @@ class RiskServer:
                         self.send_to_client(client_socket, True)
                     else:
                         self.send_to_client(client_socket, False)
-                    # if message.get("code") == self.game_code:
-                    #     self.send_to_client(client_socket, {"type": "code_result", "result": "pass"})
-                    # else:
-                    #     self.send_to_client(client_socket, {"type": "code_result", "result": "fail"})
-
-                # if message_type == "saved_game_code":
-                #     time.sleep(0.1)
-                #     if message.get("code") == self.game_code:
-                #         self.send_to_client()
 
                 if message_type == "start_game":
                     print("Host started game")
+                    self.game_started = True
                     for player in self.player_list:
                         player.color = colors[0]
                         colors.pop(0)
@@ -132,6 +126,7 @@ class RiskServer:
                     self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "initial_territory_selection"})
 
                 if message_type == "start_saved_game":
+                    self.game_started = True
                     self.create_player_list()
                     for player in self.player_list:
                         self.send_to_client(player.connection, {"type": "player_color", "color": player.color})
@@ -398,7 +393,16 @@ class RiskServer:
                 self.game_host = self.connections[0]
                 self.send_to_client(self.game_host, {"type": "join_message", "message": "You are the host."})
                 time.sleep(0.1)
-        self.broadcast({"type": "player_names", "message": self.player_names, "code": self.game_code, "game_type": "new", "number": 0})
+                if self.game_started:
+                    self.removed_player_details = player
+                    self.send_to_client(self.game_host, {"type": "get_info_for_save"})
+                    time.sleep(0.1)
+        elif self.game_started and len(self.connections):
+            self.removed_player_details = player
+            self.send_to_client(self.game_host, {"type": "get_info_for_save"})
+            time.sleep(0.1)
+        if self.game_started is False:
+            self.broadcast({"type": "player_names", "message": self.player_names, "code": self.game_code, "game_type": "new", "number": 0})
         client_socket.close()
 
     def pack_territory_info(self):
@@ -437,6 +441,11 @@ class RiskServer:
                 name = player.name
                 territory_names = self.package_owned_territories(player.territories)
                 packed_player_info[name] = {"color": player.color, "cards": player.cards, "has_conquered": player.has_conquered, "soldiers_in_hand": player.soldiers_in_hand, "isOut": player.isOut, "territory_names": territory_names, "is_out_initial": player.is_out_initial}
+        if self.removed_player_details:
+            if self.removed_player_details.isOut is False:
+                name = self.removed_player_details.name
+                territory_names = self.package_owned_territories(self.removed_player_details.territories)
+                packed_player_info[name] = {"color": self.removed_player_details.color, "cards": self.removed_player_details.cards, "has_conquered": self.removed_player_details.has_conquered, "soldiers_in_hand": self.removed_player_details.soldiers_in_hand, "isOut": self.removed_player_details.isOut, "territory_names": territory_names, "is_out_initial": self.removed_player_details.is_out_initial}
         return packed_player_info
 
     def package_owned_territories(self, territories):
