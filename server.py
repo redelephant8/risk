@@ -167,7 +167,7 @@ class RiskServer:
                             self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "initial_territory_selection"})
                         else:
                             self.current_player = self.player_list[0]
-                            self.players_remaining = self.player_number
+                            self.players_remaining = len(self.player_names)
                             self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info,
                                              "current_player": self.current_player.name}))
                             time.sleep(0.1)
@@ -848,8 +848,8 @@ def get_save_file(save_code):
         # Delete the save from the database
 
         #temporary commented!!!!!!
-        # cursor.execute('DELETE FROM game_progress WHERE game_code = ?', (save_code,))
-        # conn.commit()
+        cursor.execute('DELETE FROM game_progress WHERE game_code = ?', (save_code,))
+        conn.commit()
 
         # Close the database connection
         conn.close()
@@ -882,7 +882,7 @@ def generate_unique_game_code():
 
 
 if __name__ == "__main__":
-    HOST = "192.168.86.248"  # Change this to your server's IP address
+    HOST = "192.168.86.250"  # Change this to your server's IP address
     PORT = 8080  # Choose a suitable port
     server = RiskServer(HOST, PORT)
     server.start()
