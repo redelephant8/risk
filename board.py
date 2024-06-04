@@ -126,7 +126,7 @@ class Board:
 
     def initialize_territories_demo(self):
         # Asia
-        self.territories["siberia"] = Territory("Siberia", "siberia", "asia", 400, 100, "siberia.png")
+        self.territories["siberia"] = Territory("Siberia", "siberia", "asia", 400, 150, "siberia.png")
         self.territories["yakutsk"] = Territory("Yakutsk", "yakutsk", "asia", 600, 100, "yakutsk.png")
         self.territories["kamchatka"] = Territory("Kamchatka", "kamchatka", "asia", 800, 100, "kamchatka.png")
         self.territories["ural"] = Territory("Ural", "ural", "asia", 200, 100, "ural.png")
