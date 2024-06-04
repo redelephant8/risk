@@ -48,6 +48,7 @@ class RiskClient:
         self.save_game_count = 0
         self.saves = None
         self.player_options = None
+        self.game_ended = False
 
     def start(self):
         self.client_socket.connect((self.host, self.port))
@@ -76,7 +77,7 @@ class RiskClient:
                 self.get_player_input(screen, "name", False)
 
         # Start a separate thread for receiving data from the server
-        receive_thread = threading.Thread(target=self.receive_data)
+        receive_thread = threading.Thread(target=self.receive_data, args=(screen,))
         receive_thread.daemon = True
         receive_thread.start()
 
@@ -181,11 +182,14 @@ class RiskClient:
                 if self.game_state == "pick_save_player_options":
                     self.present_saves(screen, self.player_options, "players")
 
+                if self.game_state == "pick_save_name":
+                    self.game_ended = True
+                    self.get_player_input(screen, "save_name", False)
             pygame.display.flip()  # Update the display
 
             clock.tick(30)  # Limit frame rate to 30 FPS
 
-    def receive_data(self):
+    def receive_data(self, game_screen):
         try:
             while True:
                 # Receive messages from the server
@@ -268,6 +272,12 @@ class RiskClient:
                     self.game_state = states[1]
                     self.player_message = states[2]
 
+                if message_type == "get_info_for_save":
+                    self.game_state = "pick_save_name"
+                    # message = {"type": "save_game", "save_name": text,
+                    #            "stage": [self.game_stage, self.game_state, self.player_message]}
+                    # self.game_state = "end_game"
+
                 # if message_type == "current_player":
                 #     self.my_turn = False
                 #     self.current_player = message.get("current_player_name")
@@ -344,8 +354,10 @@ class RiskClient:
     def select_territory(self):
         selection_valid = False
         selected_territory = None
-        while not selection_valid:
+        while not selection_valid and self.game_ended is False:
             for event in pygame.event.get():
+                if self.game_ended:
+                    return
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     mouse_pos = pygame.mouse.get_pos()
                     for territory_name, territory in self.board.territories.items():
