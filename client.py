@@ -136,33 +136,28 @@ class RiskClient:
                     if self.game_stage == "attacking_territory_soldiers":
                         number = self.create_popup(screen, self.player_message, self.number) + 1
                         message = {"type": "selected_attacking_soldiers", "number": number}
-                        self.client_socket.sendall(pickle.dumps(message))
                     elif self.game_stage == "transferring_territory_soldiers":
                         number = self.create_popup(screen, self.player_message, self.number) + 1
                         message = {"type": "selected_transferring_soldiers", "number": number}
-                        self.client_socket.sendall(pickle.dumps(message))
                     elif self.game_stage == "attack_summary":
                         result_options = ["Continue Fighting", "End Combat"]
                         result_index = self.create_popup(screen, self.player_message, result_options,
                                                          dice_results=self.attacker_dice + self.defender_dice)
                         message = {"type": "selected_attack_option", "number": result_index}
-                        self.client_socket.sendall(pickle.dumps(message))
                     elif self.game_stage == "select_if_fortify":
                         result_options = ["Fortify", "End Turn"]
                         result_index = self.create_popup(screen, self.player_message, result_options)
                         message = {"type": "selected_if_fortify", "number": result_index}
-                        self.client_socket.sendall(pickle.dumps(message))
                     elif self.game_stage == "select_fortify_soldiers":
                         number = self.create_popup(screen, self.player_message, self.number) + 1
                         message = {"type": "selected_fortify_soldiers", "number": number}
-                        self.client_socket.sendall(pickle.dumps(message))
                     elif self.game_stage == "card_series":
                         result_options = ["Yes", "No"]
                         if self.number == 1:
                             result_options = ["Yes"]
                         result_index = self.create_popup(screen, self.player_message, result_options)
                         message = {"type": "selected_card_series", "number": result_index}
-                        self.client_socket.sendall(pickle.dumps(message))
+                    self.client_socket.sendall(pickle.dumps(message))
                     self.prev_game_state = self.game_state
 
                 if self.game_state == "print_board":
@@ -185,10 +180,6 @@ class RiskClient:
 
                 if self.game_state == "pick_save_player_options":
                     self.present_saves(screen, self.player_options, "players")
-
-            # if self.prev_player != self.current_player and self.game_state == "print_board":
-            #     self.edit_screen(screen, f"It's {self.current_player}'s turn")
-            #     self.prev_player = self.current_player
 
             pygame.display.flip()  # Update the display
 
@@ -216,11 +207,6 @@ class RiskClient:
                 if message_type == "join_message":
                     if message.get("message") == "You are the host.":
                         self.is_host = True  # Set the player as the host
-                        print("IJIOJDSOIFJSD, it worked")
-
-                # if message_type == "code_result":
-                #     if message.get("result") == "pass":
-                #         self.
 
                 if message_type == "player_names":
                     self.player_list = message.get("message")
@@ -239,8 +225,6 @@ class RiskClient:
                     self.player_color = message.get("color")
 
                 if message_type == "start_game":
-
-
                     print("We have officially began the risk game.")
                     self.territory_information = message.get("territory_info")
                     self.current_player = message.get("current_player")
@@ -371,9 +355,6 @@ class RiskClient:
                         save_btn = pygame.Rect(800, 550, 150, 50)
                         if self.is_host and save_btn.collidepoint(mouse_pos):
                             self.get_player_input(screen, "save_name", False)
-                            #
-                            # message = {"type": "save_game", "stage": [self.game_stage, self.game_state]}
-                            # self.client_socket.sendall(pickle.dumps(message))
                             return None
                         if self.game_stage == "attacking_territory" or self.game_stage == "defending_territory":
                             button_rect = pygame.Rect(625, 550, 150, 50)
@@ -488,10 +469,6 @@ class RiskClient:
                                 message = {"type": "name_selection", "name": self.player_name}
                             elif input_type == "code":
                                 message = {"type": "game_code", "code": text}
-                                # if self.saved_game:
-                                #     message = {"type": "saved_game_code", "code": text}
-                                # else:
-                                #     message = {"type": "game_code", "code": text}
                             elif input_type == "save_name":
                                 message = {"type": "save_game", "save_name": text, "stage": [self.game_stage, self.game_state, self.player_message]}
                                 self.game_state = "end_game"
@@ -554,9 +531,6 @@ class RiskClient:
                 pygame.draw.rect(screen, (0, 255, 0), start_button)
                 draw_text("Start Game", font, (0, 0, 0), screen, start_button.x + 50, start_button.y + 15)
 
-    # def load_game_saves(self):
-    #
-
     def start_game(self):
         # Send a message to the server indicating that the game should start
         message = {"type": "start_game"}
@@ -570,8 +544,6 @@ class RiskClient:
     def start_saved_game(self):
         message = {"type": "start_saved_game"}
         self.client_socket.sendall(pickle.dumps(message))
-
-
 
     def end_game(self, screen):
         screen.fill((194, 236, 237))  # Fill the screen with white color
