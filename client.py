@@ -49,6 +49,7 @@ class RiskClient:
         self.saves = None
         self.player_options = None
         self.game_ended = False
+        self.saved_game_state = None
 
     def start(self):
         self.client_socket.connect((self.host, self.port))
@@ -105,7 +106,7 @@ class RiskClient:
                 self.host_wait_screen(screen)
                 self.prev_player_list = self.player_list
 
-            if self.edited is False:
+            if (self.edited is False and self.game_ended is False) or (self.game_ended and self.game_state == "end_game"):
                 self.edited = True
                 if self.game_state == "select_territory":
                     self.edit_screen(screen, self.player_message)
@@ -255,6 +256,7 @@ class RiskClient:
 
                 if message_type == "end_game":
                     self.game_state = "end_game"
+                    self.game_ended = True
 
                 if message_type == "saves":
                     self.saves = message.get("saves")
@@ -273,6 +275,7 @@ class RiskClient:
                     self.player_message = states[2]
 
                 if message_type == "get_info_for_save":
+                    self.saved_game_state = self.game_state
                     self.game_state = "pick_save_name"
                     # message = {"type": "save_game", "save_name": text,
                     #            "stage": [self.game_stage, self.game_state, self.player_message]}
@@ -365,7 +368,7 @@ class RiskClient:
                             selected_territory = territory
                             selection_valid = True
                         save_btn = pygame.Rect(800, 550, 150, 50)
-                        if self.is_host and save_btn.collidepoint(mouse_pos):
+                        if save_btn.collidepoint(mouse_pos):
                             self.get_player_input(screen, "save_name", False)
                             return None
                         if self.game_stage == "attacking_territory" or self.game_stage == "defending_territory":
@@ -465,7 +468,10 @@ class RiskClient:
                             # else:
                             #     message = {"type": "game_code", "code": text}
                         elif input_type == "save_name":
-                            message = {"type": "save_game", "save_name": text, "stage": [self.game_stage, self.game_state, self.player_message]}
+                            saved_state = self.game_state
+                            if self.saved_game_state:
+                                saved_state = self.saved_game_state
+                            message = {"type": "save_game", "save_name": text, "stage": [self.game_stage, saved_state, self.player_message]}
                             self.game_state = "end_game"
                         self.client_socket.sendall(pickle.dumps(message))
                         return
@@ -482,7 +488,10 @@ class RiskClient:
                             elif input_type == "code":
                                 message = {"type": "game_code", "code": text}
                             elif input_type == "save_name":
-                                message = {"type": "save_game", "save_name": text, "stage": [self.game_stage, self.game_state, self.player_message]}
+                                saved_state = self.game_state
+                                if self.saved_game_state:
+                                    saved_state = self.saved_game_state
+                                message = {"type": "save_game", "save_name": text, "stage": [self.game_stage, saved_state, self.player_message]}
                                 self.game_state = "end_game"
                             self.client_socket.sendall(pickle.dumps(message))
                             return
@@ -653,7 +662,7 @@ class RiskClient:
             text_rect = text.get_rect(center=button_rect.center)
             screen.blit(text, text_rect)
 
-        if self.is_host:
+        if self.game_state == "select_territory":
             save_btn = pygame.Rect(850, 550, 150, 50)
             pygame.draw.rect(screen, (0, 0, 255), save_btn)
             font = pygame.font.SysFont(None, 30)
