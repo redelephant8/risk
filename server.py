@@ -16,6 +16,7 @@ class RiskServer:
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.connections = []  # Store client connections
         self.board = Board(True)
+        self.demo = True
         self.player_list = []
         self.player_names = []
         self.game_host = None
@@ -37,6 +38,7 @@ class RiskServer:
         self.saved_player_amount = 0
         self.game_stage = []
         self.removed_player_details = None
+        self.end_game = False
 
     def start(self):
         self.server_socket.bind((self.host, self.port))
@@ -97,6 +99,10 @@ class RiskServer:
                 message = pickle.loads(data)
                 message_type = message.get("type")
                 time.sleep(0.1)
+
+                if self.end_game and message_type != "save_game":
+                    self.broadcast({"type": "end_game"}, self.game_host)
+                    continue
 
                 if message_type == "name_selection":
                     print(f"Connected player name: {message.get('name')}")
@@ -339,8 +345,9 @@ class RiskServer:
                     packed_territory_info = self.pack_territory_info()
                     packed_player_info = self.package_players()
                     progress = {"players_remaining": self.players_remaining, "territories_remaining": self.territories_remaining, "cards": self.cards, "card_reinforcements": self.card_reinforcements}
-                    save_game_progress(self.game_code, save_name, packed_player_info, current_stage, current_player_name, packed_territory_info, progress)
-                    self.broadcast({"type": "end_game"})
+                    save_game_progress(self.game_code, save_name, packed_player_info, current_stage, current_player_name, packed_territory_info, progress, self.demo)
+                    self.broadcast({"type": "end_game"}, self.game_host)
+                    self.end_game = True
 
                 if message_type == "get_saves":
                     saves = get_all_game_saves()
@@ -387,22 +394,26 @@ class RiskServer:
         player = self.find_player(client_socket)
         self.player_list.remove(player)
         self.player_names.remove(player.name)
-        if self.game_host == client_socket:
-            self.game_host = None
-            if len(self.connections) > 0:
-                self.game_host = self.connections[0]
-                self.send_to_client(self.game_host, {"type": "join_message", "message": "You are the host."})
-                time.sleep(0.1)
-                if self.game_started:
-                    self.removed_player_details = player
-                    self.send_to_client(self.game_host, {"type": "get_info_for_save"})
+        if self.end_game is False:
+            if self.game_host == client_socket:
+                self.game_host = None
+                if len(self.connections) > 0:
+                    self.game_host = self.connections[0]
+                    self.send_to_client(self.game_host, {"type": "join_message", "message": "You are the host."})
                     time.sleep(0.1)
-        elif self.game_started and len(self.connections):
-            self.removed_player_details = player
-            self.send_to_client(self.game_host, {"type": "get_info_for_save"})
-            time.sleep(0.1)
-        if self.game_started is False:
-            self.broadcast({"type": "player_names", "message": self.player_names, "code": self.game_code, "game_type": "new", "number": 0})
+                    if self.game_started:
+                        self.removed_player_details = player
+                        self.send_to_client(self.game_host, {"type": "get_info_for_save"})
+                        time.sleep(0.1)
+            elif self.game_started and len(self.connections):
+                self.removed_player_details = player
+                self.send_to_client(self.game_host, {"type": "get_info_for_save"})
+                time.sleep(0.1)
+            if self.game_started is False:
+                self.broadcast({"type": "player_names", "message": self.player_names, "code": self.game_code, "game_type": "new", "number": 0})
+            else:
+                self.end_game = True
+                self.broadcast({"type": "end_game"}, self.game_host)
         client_socket.close()
 
     def pack_territory_info(self):
@@ -746,8 +757,9 @@ def initialize_database():
         player_names TEXT,
         game_stage TEXT,
         current_player TEXT,
-        territories TEXT
-        progress TEXT
+        territories TEXT,
+        progress TEXT,
+        demo BOOLEAN
     )
     ''')
 
@@ -758,12 +770,14 @@ def initialize_database():
         cursor.execute("ALTER TABLE game_progress ADD COLUMN save_name TEXT;")
     if 'progress' not in columns:
         cursor.execute("ALTER TABLE game_progress ADD COLUMN progress TEXT;")
+    if 'demo' not in columns:
+        cursor.execute("ALTER TABLE game_progress ADD COLUMN demo BOOLEAN;")
 
     conn.commit()
     conn.close()
 
 
-def save_game_progress(game_code, save_name, player_names, game_stage, current_player, territories, progress):
+def save_game_progress(game_code, save_name, player_names, game_stage, current_player, territories, progress, demo=False):
     conn = sqlite3.connect('game_progress.db')
     cursor = conn.cursor()
     player_names_str = json.dumps(player_names)
@@ -772,9 +786,9 @@ def save_game_progress(game_code, save_name, player_names, game_stage, current_p
     progress_str = json.dumps(progress)
 
     cursor.execute('''
-    INSERT INTO game_progress (game_code, save_name, player_names, game_stage, current_player, territories, progress)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-    ''', (game_code, save_name, player_names_str, game_stage_str, current_player, territories_str, progress_str))
+    INSERT INTO game_progress (game_code, save_name, player_names, game_stage, current_player, territories, progress, demo)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (game_code, save_name, player_names_str, game_stage_str, current_player, territories_str, progress_str, demo))
     conn.commit()
     conn.close()
     print(f"Game progress saved locally with game code: {game_code}")
@@ -796,12 +810,12 @@ def get_save_file(save_code):
 
     # Query the database for the game save with the specified save code
     cursor.execute(
-        'SELECT save_name, player_names, game_stage, current_player, territories, progress FROM game_progress WHERE game_code = ?',
+        'SELECT save_name, player_names, game_stage, current_player, territories, progress, demo FROM game_progress WHERE game_code = ?',
         (save_code,))
     save = cursor.fetchone()
 
     if save:
-        save_name, player_names_str, game_stage_str, current_player, territories_str, progress_str = save
+        save_name, player_names_str, game_stage_str, current_player, territories_str, progress_str, demo = save
         # Convert JSON strings back to Python lists
         player_names = json.loads(player_names_str)
         territories = json.loads(territories_str)
@@ -824,7 +838,8 @@ def get_save_file(save_code):
             'game_stage': game_stage,
             'current_player': current_player,
             'territories': territories,
-            'progress': progress
+            'progress': progress,
+            'demo': demo
         }
     else:
         conn.close()
