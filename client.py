@@ -52,6 +52,7 @@ class RiskClient:
         self.game_ended = False
         self.saved_game_state = None
         self.can_attack = True
+        self.spectator = False
 
     def start(self):
         self.client_socket.connect((self.host, self.port))
@@ -60,23 +61,28 @@ class RiskClient:
         data = self.client_socket.recv(1024)
         message = pickle.loads(data)
         connection_num = message.get("connections")
-        if message.get("saved_game") is True:
-            self.saved_game = True
+        if connection_num <= 2:
+            if message.get("saved_game") is True:
+                self.saved_game = True
 
-        if connection_num == 1:
-            self.game_options(screen, False)
-        else:
-            self.game_options(screen, True)
-            while self.code_result == False:
-                data = self.client_socket.recv(1024)
-                self.code_result = pickle.loads(data)
-                if self.code_result is False:
-                    self.get_player_input(screen, "code", True)
-            if self.saved_game:
-                self.client_socket.sendall(pickle.dumps({"type": "pass_to_select_saved_player"}))
+            if connection_num == 1:
+                self.game_options(screen, False)
             else:
-                self.get_player_input(screen, "name", False)
-
+                self.game_options(screen, True)
+                while self.code_result == False:
+                    data = self.client_socket.recv(1024)
+                    self.code_result = pickle.loads(data)
+                    if self.code_result is False:
+                        self.get_player_input(screen, "code", True)
+                if self.saved_game:
+                    self.client_socket.sendall(pickle.dumps({"type": "pass_to_select_saved_player"}))
+                else:
+                    self.get_player_input(screen, "name", False)
+        else:
+            self.spectator = True
+            if message.get("demo"):
+                self.demo = message.get("demo")
+                self.create_board(self.demo)
         # Start a separate thread for receiving data from the server
         receive_thread = threading.Thread(target=self.receive_data, args=(screen,))
         receive_thread.daemon = True
@@ -99,8 +105,11 @@ class RiskClient:
 
             # Render the lobby screen
             if self.game_state == "lobby" and self.prev_player_list is not self.player_list:
-                self.host_wait_screen(screen)
-                self.prev_player_list = self.player_list
+                if self.spectator is False:
+                    self.host_wait_screen(screen)
+                    self.prev_player_list = self.player_list
+                else:
+                    self.spectator_wait_screen(screen)
 
             if (self.edited is False and self.game_ended is False) or (self.game_ended and self.game_state == "end_game"):
                 self.edited = True
@@ -237,6 +246,9 @@ class RiskClient:
 
                 if message_type == "start_game":
                     print("We have officially began the risk game.")
+                    if not self.demo:
+                        self.demo = message.get("demo")
+                        self.create_board(self.demo)
                     self.territory_information = message.get("territory_info")
                     self.current_player = message.get("current_player")
                     print(message.get("territory_info"))
@@ -572,6 +584,14 @@ class RiskClient:
                 start_button = pygame.Rect(250, 150 + len(self.player_list) * 40, 200, 50)
                 pygame.draw.rect(screen, (0, 255, 0), start_button)
                 draw_text("Start Game", font, (0, 0, 0), screen, start_button.x + 50, start_button.y + 15)
+
+    def spectator_wait_screen(self, screen):
+        font = pygame.font.Font(None, 36)
+        print("flipflopflipflop")
+
+        screen.fill((194, 236, 237))
+        draw_text("Waiting for game to begin...", font, (0, 0, 0), screen, 300, 75)
+
 
     def start_game(self):
         message = {"type": "start_game"}
