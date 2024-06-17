@@ -51,9 +51,9 @@ class RiskServer:
 
         while True:
             print(f"connections length: {len(self.connections)}")
-            if len(self.connections) >= 6:
+            if len(self.connections) >= 2:
                 client_socket, client_address = self.server_socket.accept()
-                if len(self.connections) < 6:
+                if len(self.connections) < 2:
                     self.connections.append(client_socket)
                     print(f"New connection from {client_socket.getpeername()}")
 
@@ -65,12 +65,20 @@ class RiskServer:
                         # Sending message to the host
                         self.send_to_client(client_socket, {"type": "join_message", "message": "You are the host."})
 
-                    client_thread = threading.Thread(target=self.handle_client, args=(client_socket,))
+                    client_thread = threading.Thread(target=self.handle_client, args=(client_socket, 0))
                     client_thread.start()
                     continue
-                print("Rejecting connection: Maximum number of players reached.")
-                self.send_to_client(client_socket, {"type": "max_players_reached"})
-                client_socket.close()
+                self.connections.append(client_socket)
+                number = len(self.connections)
+                if self.game_started:
+                    number = 10
+                print("Entering spectator mode")
+                self.send_to_client(client_socket, {"connections": number, "saved_game": self.saved_game, "demo": self.demo})
+                client_thread = threading.Thread(target=self.handle_client, args=(client_socket, 1))
+                client_thread.start()
+
+                # self.send_to_client(client_socket, {"type": "max_players_reached"})
+                # client_socket.close()
             else:
                 client_socket, client_address = self.server_socket.accept()
                 self.connections.append(client_socket)
@@ -86,10 +94,10 @@ class RiskServer:
                     time.sleep(0.1)
                     self.send_to_client(client_socket, {"type": "join_message", "message": "You are the host."})
 
-                client_thread = threading.Thread(target=self.handle_client, args=(client_socket,))
+                client_thread = threading.Thread(target=self.handle_client, args=(client_socket, 0))
                 client_thread.start()
 
-    def handle_client(self, client_socket):
+    def handle_client(self, client_socket, type):
         while True:
             try:
                 data = client_socket.recv(1024)
@@ -131,7 +139,7 @@ class RiskServer:
                     packed_territory_info = self.pack_territory_info()
                     self.player_number = len(self.player_list)
                     self.switch_player()
-                    self.broadcast(({"type": "start_game", "territory_info": packed_territory_info, "current_player": self.current_player.name}))
+                    self.broadcast(({"type": "start_game", "territory_info": packed_territory_info, "current_player": self.current_player.name, "demo": self.demo}))
                     time.sleep(0.1)
                     self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "initial_territory_selection"})
 
@@ -373,7 +381,7 @@ class RiskServer:
                     packed_player_info = self.package_players()
                     progress = {"players_remaining": self.players_remaining, "territories_remaining": self.territories_remaining, "cards": self.cards, "card_reinforcements": self.card_reinforcements}
                     save_game_progress(self.game_code, save_name, packed_player_info, current_stage, current_player_name, packed_territory_info, progress, self.demo)
-                    self.broadcast({"type": "end_game"}, self.game_host)
+                    self.broadcast({"type": "end_game"})
                     self.end_game = True
 
                 if message_type == "get_saves":
@@ -423,29 +431,30 @@ class RiskServer:
         # Client disconnected
         print(f"Client {client_socket.getpeername()} disconnected")
         self.connections.remove(client_socket)
-        player = self.find_player(client_socket)
-        self.player_list.remove(player)
-        self.player_names.remove(player.name)
-        if self.end_game is False:
-            if self.game_host == client_socket:
-                self.game_host = None
-                if len(self.connections) > 0:
-                    self.game_host = self.connections[0]
-                    self.send_to_client(self.game_host, {"type": "join_message", "message": "You are the host."})
-                    time.sleep(0.1)
-                    if self.game_started:
-                        self.removed_player_details = player
-                        self.send_to_client(self.game_host, {"type": "get_info_for_save"})
+        if type == 0:
+            player = self.find_player(client_socket)
+            self.player_list.remove(player)
+            self.player_names.remove(player.name)
+            if self.end_game is False:
+                if self.game_host == client_socket:
+                    self.game_host = None
+                    if len(self.connections) > 0:
+                        self.game_host = self.connections[0]
+                        self.send_to_client(self.game_host, {"type": "join_message", "message": "You are the host."})
                         time.sleep(0.1)
-            elif self.game_started and len(self.connections):
-                self.removed_player_details = player
-                self.send_to_client(self.game_host, {"type": "get_info_for_save"})
-                time.sleep(0.1)
-            if self.game_started is False:
-                self.broadcast({"type": "player_names", "message": self.player_names, "code": self.game_code, "game_type": "new", "number": 0, "demo": self.demo})
-            else:
-                self.end_game = True
-                self.broadcast({"type": "end_game"}, self.game_host)
+                        if self.game_started:
+                            self.removed_player_details = player
+                            self.send_to_client(self.game_host, {"type": "get_info_for_save"})
+                            time.sleep(0.1)
+                elif self.game_started and len(self.connections):
+                    self.removed_player_details = player
+                    self.send_to_client(self.game_host, {"type": "get_info_for_save"})
+                    time.sleep(0.1)
+                if self.game_started is False:
+                    self.broadcast({"type": "player_names", "message": self.player_names, "code": self.game_code, "game_type": "new", "number": 0, "demo": self.demo})
+                else:
+                    self.end_game = True
+                    self.broadcast({"type": "end_game"}, self.game_host)
         client_socket.close()
 
     def pack_territory_info(self):
