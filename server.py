@@ -39,6 +39,7 @@ class RiskServer:
         self.game_stage = []
         self.removed_player_details = None
         self.end_game = False
+        self.round_conquered_territories = 0
 
     def start(self):
         self.server_socket.bind((self.host, self.port))
@@ -228,7 +229,7 @@ class RiskServer:
                                     self.send_to_client(self.current_player.connection,
                                                         {"type": "turn_message", "turn_type": "fortify_position"})
                                 else:
-                                    self.end_turn()
+                                    self.round_summary()
 
                 if message_type == "selected_attacking_territory":
                     if message.get("territory") == "end_combat":
@@ -241,7 +242,7 @@ class RiskServer:
                             self.send_to_client(self.current_player.connection,
                                                 {"type": "turn_message", "turn_type": "fortify_position"})
                         else:
-                            self.end_turn()
+                            self.round_summary()
                     else:
                         selected_territory = self.board.territories[message.get("territory")]
                         check_selected, number = self.check_attacking_territory(selected_territory)
@@ -264,7 +265,7 @@ class RiskServer:
                             self.send_to_client(self.current_player.connection,
                                                 {"type": "turn_message", "turn_type": "fortify_position"})
                         else:
-                            self.end_turn()
+                            self.round_summary()
                     else:
                         selected_territory = self.board.territories[message.get("territory")]
                         if self.check_defending_territory(selected_territory):
@@ -296,7 +297,7 @@ class RiskServer:
                                 time.sleep(0.1)
                                 self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "fortify_position"})
                             else:
-                                self.end_turn()
+                                self.round_summary()
                         else:
                             packed_territory_info = self.pack_territory_info()
                             print(packed_territory_info)
@@ -308,33 +309,42 @@ class RiskServer:
                 if message_type == "selected_if_fortify":
                     result_index = message.get("number")
                     if result_index == 1:
-                        if self.current_player.has_conquered:
-                            card = self.cards.pop(0)
-                            self.current_player.cards[card] = self.current_player.cards[card] + 1
-                            print(card)
-                        self.switch_player()
-                        if self.current_player.isOut:
-                            while self.current_player.isOut:
-                                self.switch_player()
-                    packed_territory_info = self.pack_territory_info()
-                    print(packed_territory_info)
-                    self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info,
-                                     "current_player": self.current_player.name}))
-                    self.current_player.has_conquered = False
-                    self.current_player.soldiers_in_hand = self.current_player.reinforcement_calculator()
-                    if result_index == 1:
-                        card_series, forced = self.has_card_series()
-                        if card_series and self.card_reinforcements != []:
-                            self.send_to_client(self.current_player.connection,
-                                                {"type": "turn_message", "turn_type": "card_turn_in",
-                                                 "number": self.card_reinforcements[0], "forced": forced})
-                        else:
-                            self.send_to_client(self.current_player.connection,
-                                               {"type": "turn_message", "turn_type": "receiving_reinforcements", "number": self.current_player.soldiers_in_hand, "first_time": "True"})
+                        self.round_summary()
                     else:
                         self.fortify = []
                         self.send_to_client(self.current_player.connection,
                                             {"type": "turn_message", "turn_type": "select_fortify_territory"})
+
+
+
+                    # if result_index == 1:
+                    #     if self.current_player.has_conquered:
+                    #         card = self.cards.pop(0)
+                    #         self.current_player.cards[card] = self.current_player.cards[card] + 1
+                    #         print(card)
+                    #     self.switch_player()
+                    #     if self.current_player.isOut:
+                    #         while self.current_player.isOut:
+                    #             self.switch_player()
+                    # packed_territory_info = self.pack_territory_info()
+                    # print(packed_territory_info)
+                    # self.broadcast(({"type": "edit_board", "territory_info": packed_territory_info,
+                    #                  "current_player": self.current_player.name}))
+                    # self.current_player.has_conquered = False
+                    # self.current_player.soldiers_in_hand = self.current_player.reinforcement_calculator()
+                    # if result_index == 1:
+                    #     card_series, forced = self.has_card_series()
+                    #     if card_series and self.card_reinforcements != []:
+                    #         self.send_to_client(self.current_player.connection,
+                    #                             {"type": "turn_message", "turn_type": "card_turn_in",
+                    #                              "number": self.card_reinforcements[0], "forced": forced})
+                    #     else:
+                    #         self.send_to_client(self.current_player.connection,
+                    #                            {"type": "turn_message", "turn_type": "receiving_reinforcements", "number": self.current_player.soldiers_in_hand, "first_time": "True"})
+                    # else:
+                    #     self.fortify = []
+                    #     self.send_to_client(self.current_player.connection,
+                    #                         {"type": "turn_message", "turn_type": "select_fortify_territory"})
 
                 if message_type == "selected_fortify_territory_home":
                     selected_territory = self.board.territories[message.get("territory")]
@@ -353,7 +363,7 @@ class RiskServer:
                     if self.check_selected_fortify_territory_new_home(selected_territory, self.fortify[0]):
                         selected_territory.soldierNumber += self.fortify[1]
                         self.fortify[0].soldierNumber -= self.fortify[1]
-                        self.end_turn()
+                        self.round_summary()
 
                 if message_type == "save_game":
                     current_stage = message.get("stage")
@@ -400,6 +410,9 @@ class RiskServer:
 
                 if message_type == "pass_to_select_saved_player":
                     self.send_to_client(client_socket,{"type": "player_options", "player_options": self.saved_player_names})
+
+                if message_type == "accepted_turn_end":
+                    self.end_turn()
 
             except Exception as e:
                 import traceback
@@ -658,6 +671,7 @@ class RiskServer:
             self.dice = [attacker_dice, defender_dice, defending_territory.owner.name]
             defending_territory.owner = attacking_territory.owner
             self.current_player.has_conquered = True
+            self.round_conquered_territories += 1
             if flag:
                 packed_territory_info = self.pack_territory_info()
                 self.send_to_client(flag.connection, {"type": "edit_board", "territory_info": packed_territory_info, "current_player": self.current_player.name, "out": "True"})
@@ -693,10 +707,7 @@ class RiskServer:
     #                          "number": self.current_player.soldiers_in_hand, "first_time": "True"})
 
     def end_turn(self):
-        if self.current_player.has_conquered:
-            card = self.cards.pop(0)
-            self.current_player.cards[card] = self.current_player.cards[card] + 1
-            print(card)
+        self.round_conquered_territories = 0
         self.switch_player()
         if self.current_player.isOut:
             while self.current_player.isOut:
@@ -717,6 +728,14 @@ class RiskServer:
             self.send_to_client(self.current_player.connection,
                              {"type": "turn_message", "turn_type": "receiving_reinforcements",
                                  "number": self.current_player.soldiers_in_hand, "first_time": "True"})
+
+    def round_summary(self):
+        if self.current_player.has_conquered:
+            card = self.cards.pop(0)
+            self.current_player.cards[card] = self.current_player.cards[card] + 1
+            print(card)
+        self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "round_summary",
+                                                             "territories_conquered": self.round_conquered_territories, "cards": self.current_player.cards})
 
     def check_win(self):
         count = 0
