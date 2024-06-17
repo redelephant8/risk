@@ -63,8 +63,6 @@ class RiskClient:
         if message.get("saved_game") is True:
             self.saved_game = True
 
-        # self.demo_option(screen)
-
         if connection_num == 1:
             self.game_options(screen, False)
         else:
@@ -83,10 +81,6 @@ class RiskClient:
         receive_thread = threading.Thread(target=self.receive_data, args=(screen,))
         receive_thread.daemon = True
         receive_thread.start()
-
-        # save_thread = threading.Thread(target=self.wait_for_save)
-        # save_thread.daemon = True
-        # save_thread.start()
 
         while True:
             for event in pygame.event.get():
@@ -148,7 +142,7 @@ class RiskClient:
                         if self.can_attack is False:
                             result_options = ["End Combat"]
                         result_index = self.create_popup(screen, self.player_message, result_options,
-                                                         dice_results=self.attacker_dice + self.defender_dice)
+                                                         added_results=self.attacker_dice + self.defender_dice)
                         if self.can_attack is False:
                             result_index += 1
                         message = {"type": "selected_attack_option", "number": result_index}
@@ -165,6 +159,10 @@ class RiskClient:
                             result_options = ["Yes"]
                         result_index = self.create_popup(screen, self.player_message, result_options)
                         message = {"type": "selected_card_series", "number": result_index}
+                    elif self.game_stage == "round_summary":
+                        self.create_summary(screen, self.player_message, self.number)
+                        message = {"type": "accepted_turn_end"}
+
                     self.client_socket.sendall(pickle.dumps(message))
                     self.prev_game_state = self.game_state
 
@@ -231,7 +229,6 @@ class RiskClient:
                         self.save_game_count = message.get("number")
                     if game_type == "saved":
                         self.saved_game = True
-                    # self.player_color = message.get("color")
                     print(message)
                     print(self.player_list)
 
@@ -270,12 +267,10 @@ class RiskClient:
                 if message_type == "saves":
                     self.saves = message.get("saves")
                     self.game_state = "pick_saves"
-                    # self.present_saves(screen, saves, "saves")
 
                 if message_type == "player_options":
                     self.player_options = message.get("player_options")
                     self.game_state = "pick_save_player_options"
-                    # self.present_saves(player_options, "players")
 
                 if message_type == "continue_game":
                     states = message.get("stage")
@@ -286,15 +281,6 @@ class RiskClient:
                 if message_type == "get_info_for_save":
                     self.saved_game_state = self.game_state
                     self.game_state = "pick_save_name"
-                    # message = {"type": "save_game", "save_name": text,
-                    #            "stage": [self.game_stage, self.game_state, self.player_message]}
-                    # self.game_state = "end_game"
-
-                # if message_type == "current_player":
-                #     self.my_turn = False
-                #     self.current_player = message.get("current_player_name")
-                #     if self.territory_information != {}:
-                #         self.game_state = "print_board"
 
                 if message_type == "turn_message":
                     print("It is my turn")
@@ -361,6 +347,11 @@ class RiskClient:
                         self.number = message.get("forced")
                         self.game_state = "select_soldiers"
                         self.game_stage = "card_series"
+                    elif message.get("turn_type") == "round_summary":
+                        self.player_message = "Round Summary"
+                        self.number = [message.get("territories_conquered"), message.get("cards")]
+                        self.game_state = "select_soldiers"
+                        self.game_stage = "round_summary"
         except Exception as e:
             print(f"Error in client: {e}")
 
@@ -450,11 +441,8 @@ class RiskClient:
                             self.client_socket.sendall(pickle.dumps(message))
                             return
             screen.fill((194, 236, 237))
-            # Render the welcome message.
             draw_text("Welcome, would you like to start a new game or load an existing game?", font, (0, 0, 0), screen, 100, 250)
-            # Render the current text.
             color = pygame.Color('green')
-            # txt_surface = font.render(text, True, color)
 
             # Render the submit button
             if has_host:
@@ -507,10 +495,6 @@ class RiskClient:
                             message = {"type": "name_selection", "name": self.player_name, "demo": self.demo}
                         elif input_type == "code":
                             message = {"type": "game_code", "code": text}
-                            # if self.saved_game:
-                            #     message = {"type": "saved_game_code", "code": text}
-                            # else:
-                            #     message = {"type": "game_code", "code": text}
                         elif input_type == "save_name":
                             saved_state = self.game_state
                             if self.saved_game_state:
@@ -519,7 +503,6 @@ class RiskClient:
                             self.game_state = "end_game"
                         self.client_socket.sendall(pickle.dumps(message))
                         return
-                    # Change the current color of the input box.
                     color = color_active if active else color_inactive
                 if event.type == KEYDOWN:
                     if active:
@@ -555,17 +538,12 @@ class RiskClient:
                     draw_text("Welcome, please enter the game code!", font, (0, 0, 0), screen, 300, 250)
             elif input_type == "save_name":
                 draw_text("Please enter a name for your local save:", font, (0, 0, 0), screen, 300, 250)
-            # Render the current text.
             txt_surface = font.render(text, True, color)
-            # Resize the box if the text is too long.
             width = max(200, txt_surface.get_width() + 10)
             input_box.w = width
-            # Blit the text.
             screen.blit(txt_surface, (input_box.x + 5, input_box.y + 5))
-            # Blit the input_box rect.
             pygame.draw.rect(screen, color, input_box, 2)
 
-            # Render the submit button
             pygame.draw.rect(screen, color_submit, submit_button)
             draw_text("Submit", font, (255, 255, 255), screen, 370, 360)
 
@@ -591,38 +569,29 @@ class RiskClient:
         if self.is_host:
             if (self.saved_game and len(self.player_list) == self.save_game_count) or (
                     self.saved_game is False and len(self.player_list) >= 2):
-                # Display "Start Game" button
                 start_button = pygame.Rect(250, 150 + len(self.player_list) * 40, 200, 50)
                 pygame.draw.rect(screen, (0, 255, 0), start_button)
                 draw_text("Start Game", font, (0, 0, 0), screen, start_button.x + 50, start_button.y + 15)
 
     def start_game(self):
-        # Send a message to the server indicating that the game should start
         message = {"type": "start_game"}
         self.client_socket.sendall(pickle.dumps(message))
         print("Start game message sent to server")
-
-        # save_thread = threading.Thread(target=self.wait_for_save)
-        # save_thread.daemon = True
-        # save_thread.start()
 
     def start_saved_game(self):
         message = {"type": "start_saved_game"}
         self.client_socket.sendall(pickle.dumps(message))
 
     def end_game(self, screen):
-        screen.fill((194, 236, 237))  # Fill the screen with white color
-        font = pygame.font.Font(None, 36)  # Font for rendering text
+        screen.fill((194, 236, 237))
+        font = pygame.font.Font(None, 36)
         draw_text("The game has been ended by host", font, (0, 0, 0), screen, 300, 50)
         pygame.display.flip()
         pygame.time.Clock().tick(30)
 
     def update_local_board(self):
-        # for territory_name, territory in self.board.territories.items
         for territory_name, territory_info in self.territory_information.items():
             self.board.territories[territory_name].soldierNumber = territory_info[0]
-
-            #THIS ALSO NEEDS TO BE FIXED
             self.board.territories[territory_name].owner = territory_name
 
     def present_saves(self, screen, saves, save_type):
@@ -734,7 +703,7 @@ class RiskClient:
         # Control the frame rate
         pygame.time.Clock().tick(30)
 
-    def create_popup(self, screen, text, options, dice_results=None):
+    def create_popup(self, screen, text, options, added_results=None):
         # Determine popup size based on content
         popup_width = 400
         option_height = 40
@@ -745,7 +714,7 @@ class RiskClient:
         num_rows = min(len(options), max_options_per_column)
         popup_height = 200 + num_rows * option_height
 
-        if dice_results:
+        if added_results:
             popup_height += 150  # Additional height for dice results
 
         popup_x = (width - popup_width) // 2
@@ -801,22 +770,62 @@ class RiskClient:
                         if button_rect.collidepoint(mouse_pos):
                             return i
 
-    # def wait_for_save(self):
-    #     while True:
-    #         for event in pygame.event.get():
-    #             print("Yes")
-    #             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-    #                 mouse_pos = pygame.mouse.get_pos()
-    #                 save_btn = pygame.Rect(800, 550, 150, 50)
-    #                 if save_btn.collidepoint(mouse_pos):
-    #                     self.get_player_input(screen, "save_name", False)
-    #                     # self.game_state = "end_game"
-    #                     # self.client_socket.sendall(pickle.dumps(message))
+    def create_summary(self, screen, text, added_results):
+        popup_width = 400
+        popup_height = 500
+        option_height = 40
+
+        width, height = screen.get_size()  # Get screen size to calculate popup position
+        popup_x = (width - popup_width) // 2
+        popup_y = (height - popup_height) // 2
+        popup_rect = pygame.Rect(popup_x, popup_y, popup_width, popup_height)
+
+        # Draw the popup window
+        pygame.draw.rect(screen, (200, 200, 200), popup_rect)
+        pygame.draw.rect(screen, (0, 0, 0), popup_rect, 2)
+
+        font = pygame.font.SysFont(None, 30)
+
+        # Render the main text
+        text_surface = font.render(text, True, (0, 0, 0))
+        text_rect = text_surface.get_rect(center=(popup_x + popup_width // 2, popup_y + 40))
+        screen.blit(text_surface, text_rect)
+
+        if self.game_stage == "round_summary":
+            result_surface = font.render(f"Conquered territories: {added_results[0]}", True, (0, 0, 0))
+            result_rect = result_surface.get_rect(center=(popup_x + popup_width // 2, popup_y + 100 + option_height))
+            screen.blit(result_surface, result_rect)
+
+            result_surface = font.render(f"Infantry cards: {added_results[1]["infantry"]}", True, (0, 0, 0))
+            result_rect = result_surface.get_rect(center=(popup_x + popup_width // 2, popup_y + 100 + 2 * option_height))
+            screen.blit(result_surface, result_rect)
+
+            result_surface = font.render(f"Cavalry cards: {added_results[1]["cavalry"]}", True, (0, 0, 0))
+            result_rect = result_surface.get_rect(center=(popup_x + popup_width // 2, popup_y + 100 + 3 * option_height))
+            screen.blit(result_surface, result_rect)
+
+            result_surface = font.render(f"Artillery cards: {added_results[1]["artillery"]}", True, (0, 0, 0))
+            result_rect = result_surface.get_rect(center=(popup_x + popup_width // 2, popup_y + 100 + 4 * option_height))
+            screen.blit(result_surface, result_rect)
+
+            button_rect = pygame.Rect(popup_x + popup_width // 2, popup_y + 100 + 5 * option_height, 100, option_height)
+            pygame.draw.rect(screen, (100, 100, 255), button_rect)
+            text_surface = font.render("End Turn", True, (255, 255, 255))
+            text_rect = text_surface.get_rect(center=button_rect.center)
+            screen.blit(text_surface, text_rect)
+
+        pygame.display.flip()
+
+        while True:
+            for event in pygame.event.get():
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    mouse_pos = pygame.mouse.get_pos()
+                    if button_rect.collidepoint(mouse_pos):
+                        return
 
 
 if __name__ == "__main__":
-    HOST = "192.168.86.250"  # Change this to your server's IP address
-    PORT = 8080  # Choose the same port as the server
-    # player_name = input("Enter your player name: ")
+    HOST = "192.168.86.250"
+    PORT = 8080
     client = RiskClient(HOST, PORT)
     client.start()
