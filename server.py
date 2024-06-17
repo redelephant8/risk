@@ -15,8 +15,8 @@ class RiskServer:
         self.port = port
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.connections = []  # Store client connections
-        self.board = Board(True)
-        self.demo = True
+        self.board = None
+        self.demo = None
         self.player_list = []
         self.player_names = []
         self.game_host = None
@@ -24,7 +24,7 @@ class RiskServer:
         self.current_player = None
         self.player_number = 0
         self.players_remaining = 0
-        self.territories_remaining = len(self.board.territories)
+        self.territories_remaining = 0
         self.current_attacking_territory = None
         self.current_attack_number = 0
         self.current_defending_territory = None
@@ -107,8 +107,11 @@ class RiskServer:
                 if message_type == "name_selection":
                     print(f"Connected player name: {message.get('name')}")
                     self.player_names.append(message.get('name'))
+                    if not self.demo:
+                        self.demo = message.get("demo")
+                        self.create_board()
                     self.player_list.append(Player("None", message.get('name'), client_socket))
-                    self.broadcast({"type": "player_names", "message": self.player_names, "code": self.game_code, "game_type": "new", "number": 0})
+                    self.broadcast({"type": "player_names", "message": self.player_names, "code": self.game_code, "game_type": "new", "number": 0, "demo": self.demo})
 
                 if message_type == "game_code":
                     if message.get("code") == self.game_code:
@@ -214,7 +217,18 @@ class RiskServer:
                         if self.current_player.soldiers_in_hand > 0:
                             self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "receiving_reinforcements", "number": self.current_player.soldiers_in_hand, "first_time": "False"})
                         else:
-                            self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "select_attacking_territory"})
+                            if self.check_if_can_attack():
+                                self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "select_attacking_territory"})
+                            else:
+                                if self.check_if_can_fortify():
+                                    packed_territory_info = self.pack_territory_info()
+                                    self.broadcast({"type": "edit_board", "territory_info": packed_territory_info,
+                                                    "current_player": self.current_player.name})
+                                    time.sleep(0.1)
+                                    self.send_to_client(self.current_player.connection,
+                                                        {"type": "turn_message", "turn_type": "fortify_position"})
+                                else:
+                                    self.end_turn()
 
                 if message_type == "selected_attacking_territory":
                     if message.get("territory") == "end_combat":
@@ -261,7 +275,10 @@ class RiskServer:
                     num_transferring_soldiers = message.get("number")
                     self.current_defending_territory.soldierNumber = num_transferring_soldiers
                     self.current_attacking_territory.soldierNumber -= num_transferring_soldiers
-                    self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "attack_results", "attacker_dice": self.dice[0], "defender_dice": self.dice[1], "defender": self.dice[2]})
+                    can_attack = False
+                    if self.check_if_can_attack():
+                        can_attack = True
+                    self.send_to_client(self.current_player.connection, {"type": "turn_message", "turn_type": "attack_results", "attacker_dice": self.dice[0], "defender_dice": self.dice[1], "defender": self.dice[2], "can_attack": can_attack})
 
                 if message_type == "selected_attack_option":
                     if self.check_win():
@@ -358,6 +375,8 @@ class RiskServer:
                     save_file = get_save_file(save_code)
                     if save_file:
                         player_list = save_file["player_names"]
+                        self.demo = save_file["demo"]
+                        self.create_board()
                         self.repack_players(player_list, client_socket)
                         self.game_code = save_file["game_code"]
                         self.game_stage = save_file["game_stage"]
@@ -377,7 +396,7 @@ class RiskServer:
                     self.saved_player_names.remove(selected_player_name)
                     selected_player = self.find_player_by_name(selected_player_name)
                     selected_player.connection = client_socket
-                    self.broadcast({"type": "player_names", "message": self.player_names, "code": self.game_code, "game_type": "saved", "number": self.saved_player_amount})
+                    self.broadcast({"type": "player_names", "message": self.player_names, "code": self.game_code, "game_type": "saved", "number": self.saved_player_amount, "demo": self.demo})
 
                 if message_type == "pass_to_select_saved_player":
                     self.send_to_client(client_socket,{"type": "player_options", "player_options": self.saved_player_names})
@@ -410,7 +429,7 @@ class RiskServer:
                 self.send_to_client(self.game_host, {"type": "get_info_for_save"})
                 time.sleep(0.1)
             if self.game_started is False:
-                self.broadcast({"type": "player_names", "message": self.player_names, "code": self.game_code, "game_type": "new", "number": 0})
+                self.broadcast({"type": "player_names", "message": self.player_names, "code": self.game_code, "game_type": "new", "number": 0, "demo": self.demo})
             else:
                 self.end_game = True
                 self.broadcast({"type": "end_game"}, self.game_host)
@@ -715,6 +734,13 @@ class RiskServer:
                 flag = True
         return flag
 
+    def check_if_can_attack(self):
+        flag = False
+        for territory in self.current_player.territories:
+            if territory.soldierNumber > 1 and territory.check_neighbors(self.current_player):
+                flag = True
+        return flag
+
     def has_card_series(self):
         infantry = self.current_player.cards["infantry"]
         cavalry = self.current_player.cards["cavalry"]
@@ -743,6 +769,13 @@ class RiskServer:
             self.current_player.cards["infantry"] -= 1
             self.current_player.cards["cavalry"] -= 1
             self.current_player.cards["artillery"] -= 1
+
+    def create_board(self):
+        if self.demo:
+            self.board = Board(True)
+        else:
+            self.board = Board(False)
+        self.territories_remaining = len(self.board.territories)
 
 
 def initialize_database():
