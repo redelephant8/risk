@@ -32,7 +32,8 @@ class RiskClient:
         self.prev_player_list = []
         self.prev_game_state = "None"
         self.is_host = False  # Variable to track whether the player is the host
-        self.board = Board(True)
+        self.board = None
+        self.demo = False
         self.territory_information = {}
         self.current_player = None
         self.prev_player = None
@@ -50,6 +51,7 @@ class RiskClient:
         self.player_options = None
         self.game_ended = False
         self.saved_game_state = None
+        self.can_attack = True
 
     def start(self):
         self.client_socket.connect((self.host, self.port))
@@ -143,8 +145,12 @@ class RiskClient:
                         message = {"type": "selected_transferring_soldiers", "number": number}
                     elif self.game_stage == "attack_summary":
                         result_options = ["Continue Fighting", "End Combat"]
+                        if self.can_attack is False:
+                            result_options = ["End Combat"]
                         result_index = self.create_popup(screen, self.player_message, result_options,
                                                          dice_results=self.attacker_dice + self.defender_dice)
+                        if self.can_attack is False:
+                            result_index += 1
                         message = {"type": "selected_attack_option", "number": result_index}
                     elif self.game_stage == "select_if_fortify":
                         result_options = ["Fortify", "End Turn"]
@@ -217,6 +223,9 @@ class RiskClient:
                     self.player_list = message.get("message")
                     self.game_code = message.get("code")
                     self.game_state = "lobby"
+                    if not self.demo:
+                        self.demo = message.get("demo")
+                        self.create_board(self.demo)
                     game_type = message.get("game_type")
                     if message.get("number") != 0:
                         self.save_game_count = message.get("number")
@@ -327,6 +336,7 @@ class RiskClient:
                         self.attacker_dice = message.get("attacker_dice")
                         self.defender_dice = message.get("defender_dice")
                         self.player_message = f"You rolled: {self.attacker_dice}; {message.get("defender")} rolled: {self.defender_dice}"
+                        self.can_attack = message.get("can_attack")
                         self.game_state = "select_soldiers"
                         self.game_stage = "attack_summary"
                     elif message.get("turn_type") == "fortify_position":
@@ -378,6 +388,39 @@ class RiskClient:
                                 selection_valid = True
         return selected_territory
 
+    def choose_demo(self, screen):
+        pygame.font.init()
+        yes_button = pygame.Rect(400, 350, 200, 40)
+        no_button = pygame.Rect(400, 450, 220, 40)
+        font = pygame.font.Font(None, 32)
+        running = True
+        while running:
+            for event in pygame.event.get():
+                if event.type == QUIT:
+                    pygame.quit()
+                if event.type == MOUSEBUTTONDOWN:
+                    if yes_button.collidepoint(event.pos):
+                        self.create_board(True)
+                        return
+                    if no_button.collidepoint(event.pos):
+                        self.create_board(False)
+                        return
+            screen.fill((194, 236, 237))
+            draw_text("Demo?", font, (0, 0, 0), screen,
+                      100, 250)
+            color = pygame.Color('green')
+
+            pygame.draw.rect(screen, color, yes_button)
+            pygame.draw.rect(screen, color, no_button)
+            text = font.render("Yes", True, (255, 255, 255))
+            text_rect = text.get_rect(center=yes_button.center)
+            screen.blit(text, text_rect)
+
+            text = font.render("No", True, (255, 255, 255))
+            text_rect = text.get_rect(center=no_button.center)
+            screen.blit(text, text_rect)
+            pygame.display.flip()
+
     def game_options(self, screen, has_host):
         pygame.font.init()
         if has_host:
@@ -399,6 +442,7 @@ class RiskClient:
                             return
                     else:
                         if new_game_button.collidepoint(event.pos):
+                            self.choose_demo(screen)
                             self.get_player_input(screen, "name", False)
                             return
                         if load_game_button.collidepoint(event.pos):
@@ -460,7 +504,7 @@ class RiskClient:
                         message = ""
                         if input_type == "name":
                             self.player_name = text
-                            message = {"type": "name_selection", "name": self.player_name}
+                            message = {"type": "name_selection", "name": self.player_name, "demo": self.demo}
                         elif input_type == "code":
                             message = {"type": "game_code", "code": text}
                             # if self.saved_game:
@@ -484,7 +528,7 @@ class RiskClient:
                             message = ""
                             if input_type == "name":
                                 self.player_name = text
-                                message = {"type": "name_selection", "name": self.player_name}
+                                message = {"type": "name_selection", "name": self.player_name, "demo": self.demo}
                             elif input_type == "code":
                                 message = {"type": "game_code", "code": text}
                             elif input_type == "save_name":
@@ -643,6 +687,14 @@ class RiskClient:
             pygame.display.flip()
 
         pygame.quit()
+
+    def create_board(self, demo):
+        if demo:
+            self.demo = True
+            self.board = Board(True)
+        else:
+            self.demo = False
+            self.board = Board(False)
 
     def edit_screen(self, screen, message=None):
         # Clear the screen
